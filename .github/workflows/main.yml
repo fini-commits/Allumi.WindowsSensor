@@ -1,12 +1,11 @@
 name: Build Windows Sensor (Squirrel)
 
 on:
-  workflow_dispatch: {}   # run manually from the Actions tab
+  workflow_dispatch: {}
 
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -16,21 +15,52 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Find project file
+        id: proj
+        shell: pwsh
+        run: |
+          $proj = Get-ChildItem -Recurse -Filter *.csproj | Select-Object -First 1
+          if (-not $proj) { Write-Error "No .csproj found"; exit 1 }
+          Write-Host "Found project: $($proj.FullName)"
+          echo "path=$($proj.FullName)" >> $env:GITHUB_OUTPUT
+
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore "${{ steps.proj.outputs.path }}"
 
       - name: Publish single-file exe
-        run: dotnet publish ./Allumi.WindowsSensor.csproj -c Release -r win-x64 -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+        run: >
+          dotnet publish "${{ steps.proj.outputs.path }}"
+          -c Release -r win-x64
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o publish
+
+      - name: Show publish output
+        shell: pwsh
+        run: |
+          Write-Host "Publish directory contents:"
+          Get-ChildItem -Recurse publish | Format-Table -AutoSize
 
       - name: Install Squirrel CLI
         run: dotnet tool install --global Squirrel.Windows
+
       - name: Add dotnet tools to PATH
         run: echo "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
+      - name: Find published exe
+        id: exe
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem publish -Filter *.exe | Select-Object -First 1
+          if (-not $exe) { Write-Error "No EXE found in publish/"; exit 1 }
+          Write-Host "Found exe: $($exe.FullName)"
+          echo "path=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+
       - name: Releasify with Squirrel
+        shell: pwsh
         run: |
           New-Item -ItemType Directory -Path dist -Force | Out-Null
-          Squirrel --releasify publish\Allumi.WindowsSensor.exe --releaseDir dist
+          & Squirrel --releasify "${{ steps.exe.outputs.path }}" --releaseDir dist
 
       - name: Upload Squirrel artifacts
         uses: actions/upload-artifact@v4

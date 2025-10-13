@@ -29,6 +29,23 @@ namespace Allumi.WindowsSensor.Update
             }
         }
 
+        public static void HandleSquirrelEvents(Action<string>? log = null)
+        {
+            try
+            {
+                SquirrelAwareApp.HandleEvents(
+                    onInitialInstall: v => { /* e.g., create shortcuts if needed */ },
+                    onAppUpdate: v => { /* e.g., refresh shortcuts */ },
+                    onAppUninstall: v => { /* cleanup if needed */ },
+                    onFirstRun: () => { /* first run after install */ }
+                );
+            }
+            catch (Exception ex)
+            {
+                log?.Invoke($"Squirrel events error: {ex.Message}");
+            }
+        }
+
         public static async Task HandleSquirrelEventsAsync(string[] args, Action<string>? log = null)
         {
             try

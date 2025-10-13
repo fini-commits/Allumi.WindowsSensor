@@ -1,0 +1,39 @@
+name: Build Windows Sensor (Squirrel)
+
+on:
+  workflow_dispatch: {}   # run manually from the Actions tab
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Publish single-file exe
+        run: dotnet publish ./Allumi.WindowsSensor.csproj -c Release -r win-x64 -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+
+      - name: Install Squirrel CLI
+        run: dotnet tool install --global Squirrel.Windows
+      - name: Add dotnet tools to PATH
+        run: echo "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Releasify with Squirrel
+        run: |
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Squirrel --releasify publish\Allumi.WindowsSensor.exe --releaseDir dist
+
+      - name: Upload Squirrel artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-sensor-squirrel
+          path: dist/**

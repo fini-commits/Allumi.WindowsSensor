@@ -41,15 +41,16 @@ jobs:
           Write-Host "Publish directory contents:"
           Get-ChildItem -Recurse publish | Format-Table -AutoSize
 
-      - name: Install Squirrel tool from NuGet
+      - name: Download Squirrel.Windows (legacy CLI for packaging)
         shell: pwsh
         run: |
-          # Download squirrel.exe from the Clowd.Squirrel package
-          $toolPath = "tools"
-          New-Item -ItemType Directory -Path $toolPath -Force | Out-Null
-          dotnet tool install --tool-path $toolPath Clowd.Squirrel
-          Write-Host "Squirrel tool installed to: $toolPath"
-          Get-ChildItem $toolPath
+          # Use the legacy Squirrel.Windows.CommandLine package which has the CLI tool
+          $version = "2.0.1"
+          $url = "https://www.nuget.org/api/v2/package/squirrel.windows/$version"
+          Invoke-WebRequest -Uri $url -OutFile squirrel.zip
+          Expand-Archive squirrel.zip -DestinationPath squirrel-tools
+          Write-Host "Squirrel tools extracted"
+          Get-ChildItem squirrel-tools -Recurse -Filter *.exe
 
       - name: Find published exe
         id: exe
@@ -60,11 +61,22 @@ jobs:
           Write-Host "Found exe: $($exe.FullName)"
           echo "path=$($exe.FullName)" >> $env:GITHUB_OUTPUT
 
-      - name: Releasify with Squirrel
+      - name: Package with Squirrel
         shell: pwsh
         run: |
+          $squirrelExe = Get-ChildItem squirrel-tools -Recurse -Filter Squirrel.exe | Select-Object -First 1
+          if (-not $squirrelExe) { Write-Error "Squirrel.exe not found"; exit 1 }
+          Write-Host "Using Squirrel at: $($squirrelExe.FullName)"
+          
           New-Item -ItemType Directory -Path dist -Force | Out-Null
-          & tools\squirrel pack --packId "AllrumiWindowsSensor" --packVersion "1.0.0" --packDir publish --releaseDir dist
+          
+          $exePath = "${{ steps.exe.outputs.path }}"
+          Write-Host "Packaging: $exePath"
+          
+          & $squirrelExe.FullName --releasify $exePath --releaseDir dist --no-msi
+          
+          Write-Host "Package created in dist folder:"
+          Get-ChildItem dist
 
       - name: Upload Squirrel artifacts
         uses: actions/upload-artifact@v4

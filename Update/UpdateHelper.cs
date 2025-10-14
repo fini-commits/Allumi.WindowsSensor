@@ -6,7 +6,7 @@ namespace Allumi.WindowsSensor.Update
 {
     public static class UpdateHelper
     {
-        // feedUrl will point to your hosted RELEASES feed; we’ll set it later
+        // feedUrl will point to your hosted RELEASES feed
         public static async Task CheckAndApplyUpdatesAsync(string feedUrl, Action<string>? log = null)
         {
             try

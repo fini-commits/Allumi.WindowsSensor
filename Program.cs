@@ -6,6 +6,7 @@ using System.Text;
 using System.Windows.Forms;
 using Allumi.WindowsSensor.Models;   // <- you added this
 using Allumi.WindowsSensor.Sync;     // <- and this
+using Allumi.WindowsSensor.Update;
 
 namespace Allumi.WindowsSensor
 {
@@ -14,6 +15,8 @@ namespace Allumi.WindowsSensor
         [STAThread]
         static void Main()
         {
+            UpdateHelper.HandleSquirrelEvents();
+            _ = UpdateHelper.CheckAndApplyUpdatesAsync("https://your-host/updates");
             ApplicationConfiguration.Initialize();
             Application.Run(new TrayApp());
         }
@@ -24,12 +27,14 @@ namespace Allumi.WindowsSensor
     {
         private readonly NotifyIcon _tray;
         private readonly ActivityTracker _tracker;
-        private readonly AppConfig _cfg;
-        private readonly string _cfgPath;
+        private readonly AppConfig _cfg = null!;
+        private readonly string _cfgPath = null!;
 
         public TrayApp()
         {
-            (_cfg, _cfgPath) = Config.Load();
+            var configResult = Config.Load();
+            _cfg = configResult.cfg;
+            _cfgPath = configResult.sourcePath;
 
             _tray = new NotifyIcon
             {
@@ -186,7 +191,7 @@ namespace Allumi.WindowsSensor
             try { File.AppendAllText(_logPath, line + Environment.NewLine); } catch { }
 
             // send instantly (fire-and-forget)
-            var ev = new ActivityEvent
+            var ev = new Models.ActivityEvent
             {
                 app_name = _curProc,
                 window_title = _curTitle,

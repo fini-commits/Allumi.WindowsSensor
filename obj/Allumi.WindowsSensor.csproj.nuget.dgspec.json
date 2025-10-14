@@ -51,9 +51,9 @@
         "net8.0-windows7.0": {
           "targetAlias": "net8.0-windows",
           "dependencies": {
-            "Squirrel.Windows": {
+            "Clowd.Squirrel": {
               "target": "Package",
-              "version": "[2.0.1, )"
+              "version": "[2.11.1, )"
             }
           },
           "imports": [

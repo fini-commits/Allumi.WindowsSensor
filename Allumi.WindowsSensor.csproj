@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Squirrel.Windows" Version="2.0.1" />
+    <PackageReference Include="Clowd.Squirrel" Version="2.11.1" />
   </ItemGroup>
 
 </Project>

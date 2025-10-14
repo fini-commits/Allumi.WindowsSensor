@@ -21,3 +21,12 @@ C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Debug\net8.0-windows\A
 C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Debug\net8.0-windows\Allumi.WindowsSensor.dll
 C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Debug\net8.0-windows\refint\Allumi.WindowsSensor.dll
 C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Debug\net8.0-windows\Allumi.WindowsSensor.pdb
+C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\bin\Debug\net8.0-windows\Allumi.WindowsSensor.exe
+C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\bin\Debug\net8.0-windows\Allumi.WindowsSensor.deps.json
+C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\bin\Debug\net8.0-windows\Allumi.WindowsSensor.runtimeconfig.json
+C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\bin\Debug\net8.0-windows\Allumi.WindowsSensor.dll
+C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\bin\Debug\net8.0-windows\Allumi.WindowsSensor.pdb
+C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\bin\Debug\net8.0-windows\SquirrelLib.dll
+C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Debug\net8.0-windows\Allumi.W.1471E757.Up2Date
+C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Debug\net8.0-windows\Allumi.WindowsSensor.genruntimeconfig.cache
+C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Debug\net8.0-windows\ref\Allumi.WindowsSensor.dll

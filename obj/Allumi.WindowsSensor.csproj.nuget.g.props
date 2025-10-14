@@ -14,9 +14,9 @@
     <SourceRoot Include="C:\Program Files (x86)\Microsoft Visual Studio\Shared\NuGetPackages\" />
   </ItemGroup>
   <ImportGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
-    <Import Project="$(NuGetPackageRoot)squirrel.windows\2.0.1\build\squirrel.windows.props" Condition="Exists('$(NuGetPackageRoot)squirrel.windows\2.0.1\build\squirrel.windows.props')" />
+    <Import Project="$(NuGetPackageRoot)clowd.squirrel\2.11.1\build\Clowd.Squirrel.props" Condition="Exists('$(NuGetPackageRoot)clowd.squirrel\2.11.1\build\Clowd.Squirrel.props')" />
   </ImportGroup>
   <PropertyGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
-    <Pkgsquirrel_windows Condition=" '$(Pkgsquirrel_windows)' == '' ">C:\Users\finim\.nuget\packages\squirrel.windows\2.0.1</Pkgsquirrel_windows>
+    <PkgClowd_Squirrel Condition=" '$(PkgClowd_Squirrel)' == '' ">C:\Users\finim\.nuget\packages\clowd.squirrel\2.11.1</PkgClowd_Squirrel>
   </PropertyGroup>
 </Project>

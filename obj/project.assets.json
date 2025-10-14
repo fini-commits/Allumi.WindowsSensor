@@ -4722,7 +4722,7 @@
   },
   "projectFileDependencyGroups": {
     "net8.0-windows7.0": [
-      "Squirrel.Windows >= 2.*"
+      "Squirrel.Windows >= 2.0.1"
     ]
   },
   "packageFolders": {
@@ -4778,7 +4778,7 @@
         "dependencies": {
           "Squirrel.Windows": {
             "target": "Package",
-            "version": "[2.*, )"
+            "version": "[2.0.1, )"
           }
         },
         "imports": [

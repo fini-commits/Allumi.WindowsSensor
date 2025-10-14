@@ -12,3 +12,12 @@ C:\Users\finim\Allumi.WindowsSensor\obj\Debug\net8.0-windows\refint\Allumi.Windo
 C:\Users\finim\Allumi.WindowsSensor\obj\Debug\net8.0-windows\Allumi.WindowsSensor.pdb
 C:\Users\finim\Allumi.WindowsSensor\obj\Debug\net8.0-windows\Allumi.WindowsSensor.genruntimeconfig.cache
 C:\Users\finim\Allumi.WindowsSensor\obj\Debug\net8.0-windows\ref\Allumi.WindowsSensor.dll
+C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Debug\net8.0-windows\Allumi.WindowsSensor.csproj.AssemblyReference.cache
+C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Debug\net8.0-windows\Allumi.WindowsSensor.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Debug\net8.0-windows\Allumi.WindowsSensor.AssemblyInfoInputs.cache
+C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Debug\net8.0-windows\Allumi.WindowsSensor.AssemblyInfo.cs
+C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Debug\net8.0-windows\Allumi.WindowsSensor.csproj.CoreCompileInputs.cache
+C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Debug\net8.0-windows\Allumi.WindowsSensor.sourcelink.json
+C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Debug\net8.0-windows\Allumi.WindowsSensor.dll
+C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Debug\net8.0-windows\refint\Allumi.WindowsSensor.dll
+C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Debug\net8.0-windows\Allumi.WindowsSensor.pdb

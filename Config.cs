@@ -5,12 +5,14 @@ namespace Allumi.WindowsSensor
     public sealed class AppConfig
     {
         public string deviceId { get; set; } = "";
+        public string deviceName { get; set; } = "";
         public string apiKey   { get; set; } = "";  // device-scoped key
         public string syncUrl  { get; set; } = "";
         public string? userId  { get; set; }
 
         // optional: if your Edge Function requires the Supabase anon key in Authorization
         public string? supabaseAnonKey { get; set; }
+        public string? supabaseUrl { get; set; }
     }
 
     internal static class Config

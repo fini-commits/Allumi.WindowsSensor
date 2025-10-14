@@ -45,10 +45,10 @@ namespace Allumi.WindowsSensor
             };
 
             // Build sync client from config.json
-            var sync = new SyncClient(_cfg.apiKey, _cfg.deviceId, _cfg.syncUrl);
+            var sync = new SyncClient(_cfg.apiKey, _cfg.deviceId, _cfg.deviceName, _cfg.syncUrl);
 
             // Start tracker
-            _tracker = new ActivityTracker(sync);
+            _tracker = new ActivityTracker(sync, _cfg.deviceId, _cfg.deviceName);
             _tracker.OnTrayText += t => _tray.Text = $"Allumi Sensor • {t}";
             _tracker.Start();
 
@@ -109,39 +109,66 @@ namespace Allumi.WindowsSensor
     public sealed class ActivityTracker : IDisposable
     {
         private readonly System.Timers.Timer _poll = new(250); // ~4x/sec
+        private readonly System.Timers.Timer _syncTimer = new(60000); // Sync every 60 seconds
         private readonly TimeSpan _idleThreshold = TimeSpan.FromSeconds(60);
         private readonly SyncClient _sync;
+        private readonly string _deviceId;
+        private readonly string _deviceName;
 
         private string _curProc = "";
         private string _curTitle = "";
-        private string _curStatus = "active";
+        private bool _isIdle = false;
         private DateTime _curStart = DateTime.UtcNow;
 
         private readonly string _logPath;
 
         public event Action<string>? OnTrayText;
 
-        public ActivityTracker(SyncClient sync)
+        public ActivityTracker(SyncClient sync, string deviceId, string deviceName)
         {
             _sync = sync;
+            _deviceId = deviceId;
+            _deviceName = deviceName;
+            
             var roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             var dir = Path.Combine(roaming, "Allumi");
             Directory.CreateDirectory(dir);
             _logPath = Path.Combine(dir, "sensor.log");
 
             _poll.Elapsed += (_, __) => Tick();
+            _syncTimer.Elapsed += async (_, __) => await SyncActivitiesAsync();
         }
 
         public void Start()
         {
             _curStart = DateTime.UtcNow;
             _poll.Start();
+            _syncTimer.Start();
         }
 
         public void Stop()
         {
             _poll.Stop();
+            _syncTimer.Stop();
             CloseCurrentSession(force: true);
+            // Final sync before exit
+            _ = SyncActivitiesAsync();
+        }
+
+        private async Task SyncActivitiesAsync()
+        {
+            try
+            {
+                bool success = await _sync.FlushActivitiesAsync();
+                if (!success)
+                {
+                    Console.WriteLine("Sync failed, will retry later");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Sync error: {ex.Message}");
+            }
         }
 
         private void Tick()
@@ -152,7 +179,7 @@ namespace Allumi.WindowsSensor
             var lii = new LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>() };
             bool ok = GetLastInputInfo(ref lii);
             var idleMs = ok ? Environment.TickCount - (int)lii.dwTime : 0;
-            var status = idleMs >= _idleThreshold.TotalMilliseconds ? "idle" : "active";
+            var isIdle = idleMs >= _idleThreshold.TotalMilliseconds;
 
             // Foreground window
             var hWnd = GetForegroundWindow();
@@ -165,17 +192,18 @@ namespace Allumi.WindowsSensor
                 title = GetWindowTitle(hWnd);
             }
 
-            bool changed = status != _curStatus || process != _curProc || title != _curTitle;
+            bool changed = isIdle != _isIdle || process != _curProc || title != _curTitle;
             if (!changed) return;
 
             CloseCurrentSession();
 
             _curProc = process;
             _curTitle = title;
-            _curStatus = status;
+            _isIdle = isIdle;
             _curStart = now;
 
             var label = string.IsNullOrWhiteSpace(process) ? "no window" : process;
+            var status = isIdle ? "idle" : "active";
             OnTrayText?.Invoke($"{label} • {status}");
         }
 
@@ -186,21 +214,29 @@ namespace Allumi.WindowsSensor
             var now = DateTime.UtcNow;
             var dur = (int)Math.Max(0, (now - _curStart).TotalSeconds);
 
+            // Skip very short sessions (< 1 second)
+            if (dur < 1 && !force) return;
+
             // local debug log
-            var line = $"{now:O}\tproc={_curProc}\ttitle={_curTitle}\tstatus={_curStatus}\tdur={dur}s";
+            var status = _isIdle ? "idle" : "active";
+            var line = $"{now:O}\tproc={_curProc}\ttitle={_curTitle}\tstatus={status}\tdur={dur}s";
             try { File.AppendAllText(_logPath, line + Environment.NewLine); } catch { }
 
-            // send instantly (fire-and-forget)
+            // Queue for batch sync (Vetra format)
             var ev = new Models.ActivityEvent
             {
-                app_name = _curProc,
-                window_title = _curTitle,
-                status = _curStatus,
-                started_at = _curStart,
-                ended_at = now,
-                duration_seconds = dur
+                deviceId = _deviceId,
+                deviceName = _deviceName,
+                appName = _curProc,
+                windowTitle = _curTitle,
+                startTime = _curStart.ToUniversalTime().ToString("O"),  // ISO 8601
+                endTime = now.ToUniversalTime().ToString("O"),
+                durationSeconds = dur,
+                category = "other",  // AI will categorize
+                isIdle = _isIdle
             };
-            _ = _sync.SendEventAsync(ev);
+            
+            _sync.QueueActivity(ev);
         }
 
         public void Dispose()

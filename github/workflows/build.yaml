@@ -10,6 +10,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Debug - Show Update folder contents
+        shell: pwsh
+        run: |
+          Write-Host "Update folder contents:"
+          Get-ChildItem -Path Update -Recurse | Format-Table -AutoSize
+
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
@@ -26,6 +32,9 @@ jobs:
 
       - name: Restore
         run: dotnet restore "${{ steps.proj.outputs.path }}"
+
+      - name: Clean
+        run: dotnet clean "${{ steps.proj.outputs.path }}" -c Release
 
       - name: Publish single-file exe
         run: >

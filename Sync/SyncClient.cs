@@ -23,9 +23,7 @@ namespace Allumi.WindowsSensor.Sync
             _syncUrl = syncUrl;
             _http.Timeout = TimeSpan.FromSeconds(15);
 
-            // Vetra API uses x-api-key header
-            if (!string.IsNullOrWhiteSpace(apiKey))
-                _http.DefaultRequestHeaders.Add("x-api-key", apiKey);
+            // Note: API key is sent in request body, not as a header
         }
 
         // Queue activity for batch sending

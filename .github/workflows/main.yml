@@ -132,9 +132,11 @@ jobs:
             "--packDir", "publish",
             "--releaseDir", "releases",
             "--framework", "net8-x64-desktop",
-            "--allowUnaware",
-            "--splashImage", "https://allumi.ai/logo.png"
+            "--allowUnaware"
           )
+          
+          # Note: --splashImage requires local file path, not URL
+          # Add custom splash screen later if needed
           
           Write-Host "Command: $($squirrelExe.FullName) $($packArgs -join ' ')"
           

@@ -3,6 +3,9 @@ name: Build Windows Sensor (Squirrel)
 on:
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -77,7 +80,11 @@ jobs:
           $exePath = "${{ steps.exe.outputs.path }}"
           Write-Host "Packaging: $exePath"
           
-          # Create a NuSpec file for Squirrel
+          # Create lib/net45 directory structure for NuGet package
+          New-Item -ItemType Directory -Path "package/lib/net8.0-windows" -Force | Out-Null
+          Copy-Item $exePath -Destination "package/lib/net8.0-windows/"
+          
+          # Create a NuSpec file
           $nuspec = @"
           <?xml version="1.0" encoding="utf-8"?>
           <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
@@ -87,30 +94,43 @@ jobs:
               <title>Allumi Windows Sensor</title>
               <authors>Allumi</authors>
               <description>Windows activity tracking sensor for Allumi dashboard</description>
+              <requireLicenseAcceptance>false</requireLicenseAcceptance>
             </metadata>
           </package>
           "@
-          $nuspec | Out-File -FilePath "AllumiWindowsSensor.nuspec" -Encoding UTF8
+          $nuspec | Out-File -FilePath "package/AllumiWindowsSensor.nuspec" -Encoding UTF8
           
-          # Use NuGet to create the package
+          # Download NuGet
           $nugetUrl = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
           Invoke-WebRequest -Uri $nugetUrl -OutFile "nuget.exe"
           
-          # Pack the publish folder
-          .\nuget.exe pack AllumiWindowsSensor.nuspec -BasePath publish -OutputDirectory .
+          # Pack using the package directory structure
+          .\nuget.exe pack package/AllumiWindowsSensor.nuspec -OutputDirectory .
           
-          $nupkg = Get-ChildItem -Filter "*.nupkg" | Select-Object -First 1
+          $nupkg = Get-ChildItem -Filter "AllumiWindowsSensor.*.nupkg" | Select-Object -First 1
           if (-not $nupkg) { Write-Error "No nupkg created"; exit 1 }
           Write-Host "Created package: $($nupkg.Name)"
           
           # Now releasify the package
+          Write-Host "Running Squirrel releasify..."
           & $squirrelExe.FullName --releasify $nupkg.FullName --releaseDir releases --no-msi
           
-          Write-Host "Release created in releases folder:"
-          Get-ChildItem releases
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Squirrel releasify failed with exit code: $LASTEXITCODE"
+            exit 1
+          }
           
-          Write-Host "`nSetup.exe details:"
-          Get-ChildItem releases -Filter "Setup.exe" | Format-List
+          Write-Host "`nRelease created in releases folder:"
+          Get-ChildItem releases | Format-Table -AutoSize
+          
+          $setupExe = Get-ChildItem releases -Filter "Setup.exe" -ErrorAction SilentlyContinue
+          if ($setupExe) {
+            Write-Host "`nSetup.exe found!"
+            Write-Host "Size: $($setupExe.Length) bytes"
+          } else {
+            Write-Error "Setup.exe was not created!"
+            exit 1
+          }
 
       - name: Upload Squirrel artifacts
         uses: actions/upload-artifact@v4

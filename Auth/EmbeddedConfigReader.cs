@@ -22,17 +22,60 @@ namespace Allumi.WindowsSensor.Auth
         {
             try
             {
-                // Get the path to the currently executing assembly
+                // First, try reading from the current executable
                 var exePath = Assembly.GetExecutingAssembly().Location;
+                var configJson = TryExtractFromFile(exePath);
                 
-                if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath))
+                if (configJson != null)
                 {
-                    Console.WriteLine("Could not locate executable path");
-                    return null;
+                    Console.WriteLine("Found embedded config in current executable");
+                    return configJson;
                 }
+                
+                // If not found, try looking for the Setup.exe in common locations
+                // This handles the case where Squirrel extracts the app but config is in Setup.exe
+                var possibleSetupPaths = new[]
+                {
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Setup.exe"),
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AllumiWindowsSensor", "Setup.exe"),
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "AllumiTracker_Setup.exe")
+                };
+                
+                foreach (var setupPath in possibleSetupPaths)
+                {
+                    if (File.Exists(setupPath))
+                    {
+                        Console.WriteLine($"Checking for embedded config in: {setupPath}");
+                        configJson = TryExtractFromFile(setupPath);
+                        if (configJson != null)
+                        {
+                            Console.WriteLine("Found embedded config in Setup.exe");
+                            return configJson;
+                        }
+                    }
+                }
+                
+                Console.WriteLine("No embedded config found in any location");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error extracting embedded config: {ex.Message}");
+                return null;
+            }
+        }
+        
+        private static string? TryExtractFromFile(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            {
+                return null;
+            }
 
+            try
+            {
                 // Read the entire executable as bytes
-                byte[] exeBytes = File.ReadAllBytes(exePath);
+                byte[] exeBytes = File.ReadAllBytes(filePath);
                 
                 // Convert to string for marker search (UTF-8)
                 string exeText = Encoding.UTF8.GetString(exeBytes);
@@ -43,7 +86,6 @@ namespace Allumi.WindowsSensor.Auth
                 
                 if (startIdx < 0 || endIdx < 0 || endIdx <= startIdx)
                 {
-                    Console.WriteLine("No embedded config markers found");
                     return null;
                 }
                 
@@ -53,7 +95,6 @@ namespace Allumi.WindowsSensor.Auth
                 
                 if (configLength <= 0)
                 {
-                    Console.WriteLine("Empty config section");
                     return null;
                 }
                 
@@ -63,18 +104,15 @@ namespace Allumi.WindowsSensor.Auth
                 try
                 {
                     using var doc = JsonDocument.Parse(configJson);
-                    Console.WriteLine("Successfully extracted embedded config");
                     return configJson;
                 }
                 catch (JsonException)
                 {
-                    Console.WriteLine("Embedded data is not valid JSON");
                     return null;
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"Error extracting embedded config: {ex.Message}");
                 return null;
             }
         }

@@ -179,7 +179,7 @@ namespace Allumi.WindowsSensor
     public sealed class ActivityTracker : IDisposable
     {
         private readonly System.Timers.Timer _poll = new(250); // ~4x/sec
-        private readonly System.Timers.Timer _syncTimer = new(60000); // Sync every 60 seconds
+        private readonly System.Timers.Timer _syncTimer = new(5000); // Sync every 5 seconds for real-time tracking
         private readonly TimeSpan _idleThreshold = TimeSpan.FromSeconds(60);
         private readonly SyncClient _sync;
         private readonly string _deviceId;

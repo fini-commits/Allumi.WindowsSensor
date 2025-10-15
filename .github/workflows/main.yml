@@ -47,22 +47,41 @@ jobs:
       - name: Download Clowd.Squirrel
         shell: pwsh
         run: |
-          # Download Clowd.Squirrel standalone release
+          # Download the actual CLI tool from GitHub releases (not NuGet package)
           $version = "2.11.1"
-          $url = "https://github.com/clowd/Clowd.Squirrel/releases/download/v$version/Clowd.Squirrel.$version.nupkg"
-          Write-Host "Downloading Clowd.Squirrel v$version..."
-          Invoke-WebRequest -Uri $url -OutFile clowd-squirrel.zip
-          Expand-Archive clowd-squirrel.zip -DestinationPath clowd-tools
-          Write-Host "Clowd.Squirrel extracted"
+          $url = "https://github.com/clowd/Clowd.Squirrel/releases/download/v$version/Squirrel-$version.zip"
+          Write-Host "Downloading Clowd.Squirrel CLI v$version..."
           
-          # Find the squirrel.exe
-          $squirrelExe = Get-ChildItem clowd-tools -Recurse -Filter "squirrel.exe" | Select-Object -First 1
+          try {
+            Invoke-WebRequest -Uri $url -OutFile squirrel-cli.zip -ErrorAction Stop
+            Expand-Archive squirrel-cli.zip -DestinationPath squirrel-tools
+            Write-Host "Clowd.Squirrel CLI extracted successfully"
+          } catch {
+            Write-Host "Failed to download from GitHub releases. Trying NuGet package..."
+            $nugetUrl = "https://www.nuget.org/api/v2/package/Clowd.Squirrel/$version"
+            Invoke-WebRequest -Uri $nugetUrl -OutFile clowd-squirrel.zip
+            Expand-Archive clowd-squirrel.zip -DestinationPath squirrel-tools
+            Write-Host "NuGet package extracted"
+          }
+          
+          # Find the squirrel.exe or squirrel.windows.exe
+          Write-Host "`nSearching for Squirrel executable..."
+          $squirrelExe = Get-ChildItem squirrel-tools -Recurse -Include "squirrel*.exe" | 
+                         Where-Object { $_.Name -match '^squirrel.*\.exe$' } | 
+                         Select-Object -First 1
+          
           if ($squirrelExe) {
             Write-Host "Found Squirrel at: $($squirrelExe.FullName)"
-            & $squirrelExe.FullName --version
+            try {
+              & $squirrelExe.FullName --version
+            } catch {
+              Write-Host "Could not get version, but exe exists"
+            }
           } else {
-            Write-Host "Available executables:"
-            Get-ChildItem clowd-tools -Recurse -Filter "*.exe" | Format-Table Name, DirectoryName
+            Write-Host "`nSquirrel executable not found. Available files:"
+            Get-ChildItem squirrel-tools -Recurse | Format-Table Name, DirectoryName
+            Write-Error "Could not find Squirrel executable"
+            exit 1
           }
 
       - name: Find published exe
@@ -84,43 +103,72 @@ jobs:
         shell: pwsh
         run: |
           # Find Clowd.Squirrel executable
-          $squirrelExe = Get-ChildItem clowd-tools -Recurse -Filter "squirrel.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $squirrelExe = Get-ChildItem squirrel-tools -Recurse -Include "squirrel*.exe" -ErrorAction SilentlyContinue | 
+                         Where-Object { $_.Name -match '^squirrel.*\.exe$' } | 
+                         Select-Object -First 1
+          
           if (-not $squirrelExe) {
-            Write-Error "squirrel.exe not found in clowd-tools"
+            Write-Error "squirrel.exe not found in squirrel-tools"
+            Write-Host "Available files:"
+            Get-ChildItem squirrel-tools -Recurse
             exit 1
           }
+          
           Write-Host "Using Squirrel at: $($squirrelExe.FullName)"
           
           $exePath = "${{ steps.exe.outputs.path }}"
           Write-Host "Packaging: $exePath"
+          Write-Host "Package directory: publish"
+          
+          # List publish contents to verify
+          Write-Host "`nPublish directory contents:"
+          Get-ChildItem publish | Format-Table Name, Length
           
           # Use Clowd.Squirrel pack command
-          Write-Host "Running Clowd.Squirrel pack..."
-          & $squirrelExe.FullName pack `
-            --packId "AllumiWindowsSensor" `
-            --packVersion "1.0.${{ github.run_number }}" `
-            --packAuthors "Allumi" `
-            --packTitle "Allumi Windows Sensor" `
-            --mainExe "Allumi.WindowsSensor.exe" `
-            --packDir "publish" `
-            --releaseDir "releases"
+          Write-Host "`nRunning Clowd.Squirrel pack..."
           
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Squirrel pack failed with exit code: $LASTEXITCODE"
+          # Capture both stdout and stderr
+          $packArgs = @(
+            "pack",
+            "--packId", "AllumiWindowsSensor",
+            "--packVersion", "1.0.${{ github.run_number }}",
+            "--packAuthors", "Allumi",
+            "--packTitle", "Allumi Windows Sensor",
+            "--mainExe", "Allumi.WindowsSensor.exe",
+            "--packDir", "publish",
+            "--releaseDir", "releases"
+          )
+          
+          Write-Host "Command: $($squirrelExe.FullName) $($packArgs -join ' ')"
+          
+          & $squirrelExe.FullName @packArgs 2>&1 | Tee-Object -Variable output
+          $exitCode = $LASTEXITCODE
+          
+          Write-Host "`nSquirrel exit code: $exitCode"
+          
+          if ($exitCode -ne 0) {
+            Write-Error "Squirrel pack failed with exit code: $exitCode"
+            Write-Host "`nSquirrel output:"
+            Write-Host $output
             exit 1
           }
           
-          Write-Host "`nRelease created in releases folder:"
-          Get-ChildItem releases | Format-Table -AutoSize
+          Write-Host "`nRelease folder contents:"
+          if (Test-Path releases) {
+            Get-ChildItem releases -Recurse | Format-Table Name, Length, DirectoryName
+          } else {
+            Write-Error "releases folder was not created!"
+            exit 1
+          }
           
+          # Look for any .exe files (could be Setup.exe or AllumiWindowsSensorSetup.exe or similar)
           $setupExe = Get-ChildItem releases -Filter "*.exe" -ErrorAction SilentlyContinue
           if ($setupExe) {
-            Write-Host "`nSetup executable(s) found!"
-            $setupExe | ForEach-Object { Write-Host "  $($_.Name) - Size: $($_.Length) bytes" }
+            Write-Host "`nSetup executable(s) found:"
+            $setupExe | ForEach-Object { Write-Host "  ✓ $($_.Name) - Size: $($_.Length) bytes" }
           } else {
             Write-Error "No setup executable was created!"
-            Write-Host "`nAll files in releases:"
-            Get-ChildItem releases -Recurse
+            Write-Host "`nExpected at least one .exe file in releases folder"
             exit 1
           }
 

@@ -4,19 +4,35 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
-using Allumi.WindowsSensor.Models;   // <- you added this
-using Allumi.WindowsSensor.Sync;     // <- and this
+using System.Linq;
+using Allumi.WindowsSensor.Models;
+using Allumi.WindowsSensor.Sync;
 using Allumi.WindowsSensor.Update;
+using Allumi.WindowsSensor.Auth;
 
 namespace Allumi.WindowsSensor
 {
     internal static class Program
     {
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
+            // Handle Squirrel installation events
             UpdateHelper.HandleSquirrelEvents();
+            
+            // Register OAuth protocol handler (allumi://)
+            OAuthHandler.RegisterProtocolHandler();
+            
+            // Check if launched via allumi:// protocol
+            if (args.Length > 0 && args[0].StartsWith("allumi://", StringComparison.OrdinalIgnoreCase))
+            {
+                OAuthHandler.HandleProtocolCallback(args[0]);
+                return; // Exit after handling callback
+            }
+            
+            // Check for updates (placeholder URL - will be updated)
             _ = UpdateHelper.CheckAndApplyUpdatesAsync("https://your-host/updates");
+            
             ApplicationConfiguration.Initialize();
             Application.Run(new TrayApp());
         }
@@ -26,7 +42,7 @@ namespace Allumi.WindowsSensor
     public sealed class TrayApp : ApplicationContext
     {
         private readonly NotifyIcon _tray;
-        private readonly ActivityTracker _tracker;
+        private readonly ActivityTracker? _tracker;
         private readonly AppConfig _cfg = null!;
         private readonly string _cfgPath = null!;
 
@@ -44,24 +60,78 @@ namespace Allumi.WindowsSensor
                 Text = "Allumi Sensor • starting…"
             };
 
-            // Build sync client from config.json
-            var sync = new SyncClient(_cfg.apiKey, _cfg.deviceId, _cfg.deviceName, _cfg.syncUrl);
+            // Check if configuration is valid
+            bool hasConfig = !string.IsNullOrWhiteSpace(_cfg?.deviceId)
+                          && !string.IsNullOrWhiteSpace(_cfg?.apiKey)
+                          && !string.IsNullOrWhiteSpace(_cfg?.syncUrl);
+
+            if (!hasConfig)
+            {
+                // Show authentication prompt
+                _tray.BalloonTipTitle = "Allumi Sensor - Setup Required";
+                _tray.BalloonTipText = "Click to authenticate with your Vetra account";
+                _tray.BalloonTipClicked += async (_, __) => await AuthenticateAsync();
+                _tray.ShowBalloonTip(5000);
+                _tray.Text = "Allumi Sensor • Not Authenticated";
+                return; // Don't start tracking yet
+            }
+
+            // Build sync client from config
+            var sync = new SyncClient(_cfg.apiKey ?? "", _cfg.deviceId, _cfg.deviceName, _cfg.syncUrl);
 
             // Start tracker
             _tracker = new ActivityTracker(sync, _cfg.deviceId, _cfg.deviceName);
             _tracker.OnTrayText += t => _tray.Text = $"Allumi Sensor • {t}";
             _tracker.Start();
 
-            // First-run tip
-            bool ok = !string.IsNullOrWhiteSpace(_cfg?.deviceId)
-                   && !string.IsNullOrWhiteSpace(_cfg?.apiKey)
-                   && !string.IsNullOrWhiteSpace(_cfg?.syncUrl);
-
             _tray.BalloonTipTitle = "Allumi Sensor";
-            _tray.BalloonTipText  = ok
-                ? "Tracking active window (instant sync)."
-                : "Config not found or incomplete. Right-click → Show config path.";
+            _tray.BalloonTipText = "Tracking active window.";
             _tray.ShowBalloonTip(3000);
+        }
+
+        private async Task AuthenticateAsync()
+        {
+            try
+            {
+                _tray.Text = "Allumi Sensor • Authenticating...";
+                
+                // Use supabaseUrl from config if available, otherwise use default
+                string vetraBaseUrl = _cfg?.supabaseUrl ?? "https://lstannxhfhunacgkvtmm.supabase.co";
+                
+                var result = await OAuthHandler.AuthenticateAsync(vetraBaseUrl);
+                
+                if (!string.IsNullOrEmpty(result))
+                {
+                    // Authentication successful - reload config and restart
+                    MessageBox.Show(
+                        "Authentication successful! The app will now restart.",
+                        "Allumi Sensor",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information
+                    );
+                    
+                    Application.Restart();
+                }
+                else
+                {
+                    _tray.Text = "Allumi Sensor • Authentication Failed";
+                    MessageBox.Show(
+                        "Authentication failed or timed out. Please try again.",
+                        "Allumi Sensor",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Authentication error: {ex.Message}",
+                    "Allumi Sensor",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+            }
         }
 
         private ContextMenuStrip BuildMenu()
@@ -98,7 +168,7 @@ namespace Allumi.WindowsSensor
 
         protected override void ExitThreadCore()
         {
-            _tracker.Dispose();
+            _tracker?.Dispose();
             _tray.Visible = false;
             _tray.Dispose();
             base.ExitThreadCore();

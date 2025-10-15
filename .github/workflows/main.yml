@@ -77,9 +77,22 @@ jobs:
           
           Write-Host "Package created in dist folder:"
           Get-ChildItem dist
+          
+          # Find and rename Setup.exe for Vetra to use as base installer
+          $setupExe = Get-ChildItem dist -Filter "Setup.exe" | Select-Object -First 1
+          if ($setupExe) {
+            Copy-Item $setupExe.FullName -Destination "dist\AllumiSensorBase.exe"
+            Write-Host "Created base installer: AllumiSensorBase.exe"
+          }
 
       - name: Upload Squirrel artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-sensor-squirrel
           path: dist/**
+      
+      - name: Upload Base Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: base-installer
+          path: dist/AllumiSensorBase.exe

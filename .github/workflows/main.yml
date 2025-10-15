@@ -61,6 +61,12 @@ jobs:
           Write-Host "Found exe: $($exe.FullName)"
           echo "path=$($exe.FullName)" >> $env:GITHUB_OUTPUT
 
+      - name: Create Squirrel Release Directory
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path releases -Force | Out-Null
+          Write-Host "Created releases directory"
+
       - name: Package with Squirrel
         shell: pwsh
         run: |
@@ -68,34 +74,55 @@ jobs:
           if (-not $squirrelExe) { Write-Error "Squirrel.exe not found"; exit 1 }
           Write-Host "Using Squirrel at: $($squirrelExe.FullName)"
           
-          New-Item -ItemType Directory -Path dist -Force | Out-Null
-          
           $exePath = "${{ steps.exe.outputs.path }}"
           Write-Host "Packaging: $exePath"
           
-          & $squirrelExe.FullName --releasify $exePath --releaseDir dist --no-msi
+          # Create a NuSpec file for Squirrel
+          $nuspec = @"
+          <?xml version="1.0" encoding="utf-8"?>
+          <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+            <metadata>
+              <id>AllumiWindowsSensor</id>
+              <version>1.0.${{ github.run_number }}</version>
+              <title>Allumi Windows Sensor</title>
+              <authors>Allumi</authors>
+              <description>Windows activity tracking sensor for Allumi dashboard</description>
+            </metadata>
+          </package>
+          "@
+          $nuspec | Out-File -FilePath "AllumiWindowsSensor.nuspec" -Encoding UTF8
           
-          Write-Host "Package created in dist folder:"
-          Get-ChildItem dist
+          # Use NuGet to create the package
+          $nugetUrl = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
+          Invoke-WebRequest -Uri $nugetUrl -OutFile "nuget.exe"
           
-          # Find and rename Setup.exe for Vetra to use as base installer
-          $setupExe = Get-ChildItem dist -Filter "Setup.exe" | Select-Object -First 1
-          if ($setupExe) {
-            Copy-Item $setupExe.FullName -Destination "dist\AllumiSensorBase.exe"
-            Write-Host "Created base installer: AllumiSensorBase.exe"
-          }
+          # Pack the publish folder
+          .\nuget.exe pack AllumiWindowsSensor.nuspec -BasePath publish -OutputDirectory .
+          
+          $nupkg = Get-ChildItem -Filter "*.nupkg" | Select-Object -First 1
+          if (-not $nupkg) { Write-Error "No nupkg created"; exit 1 }
+          Write-Host "Created package: $($nupkg.Name)"
+          
+          # Now releasify the package
+          & $squirrelExe.FullName --releasify $nupkg.FullName --releaseDir releases --no-msi
+          
+          Write-Host "Release created in releases folder:"
+          Get-ChildItem releases
+          
+          Write-Host "`nSetup.exe details:"
+          Get-ChildItem releases -Filter "Setup.exe" | Format-List
 
       - name: Upload Squirrel artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-sensor-squirrel
-          path: dist/**
+          path: releases/**
       
       - name: Upload Base Installer
         uses: actions/upload-artifact@v4
         with:
           name: base-installer
-          path: dist/Setup.exe
+          path: releases/Setup.exe
       
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main'
@@ -113,9 +140,9 @@ jobs:
             ## Changes
             - Auto-commit: ${{ github.event.head_commit.message }}
           files: |
-            dist/Setup.exe
-            dist/RELEASES
-            dist/*.nupkg
+            releases/Setup.exe
+            releases/RELEASES
+            releases/*.nupkg
           draft: false
           prerelease: false
         env:

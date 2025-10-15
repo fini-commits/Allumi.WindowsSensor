@@ -14,6 +14,7 @@ namespace Allumi.WindowsSensor.Sync
         private readonly string _syncUrl;
         private readonly List<ActivityEvent> _pendingActivities = new();
         private readonly object _lock = new();
+        private readonly string _logPath;
 
         public SyncClient(string apiKey, string deviceId, string deviceName, string syncUrl)
         {
@@ -23,7 +24,23 @@ namespace Allumi.WindowsSensor.Sync
             _syncUrl = syncUrl;
             _http.Timeout = TimeSpan.FromSeconds(15);
 
+            // Setup logging
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var logDir = Path.Combine(appData, "Allumi");
+            Directory.CreateDirectory(logDir);
+            _logPath = Path.Combine(logDir, "sync.log");
+
             // Note: API key is sent in request body, not as a header
+        }
+
+        private void Log(string message)
+        {
+            try
+            {
+                var timestamp = DateTime.UtcNow.ToString("O");
+                File.AppendAllText(_logPath, $"{timestamp}\t{message}{Environment.NewLine}");
+            }
+            catch { }
         }
 
         // Queue activity for batch sending
@@ -40,6 +57,8 @@ namespace Allumi.WindowsSensor.Sync
         {
             try
             {
+                Log($"[Instant Sync] Starting sync for {activity.appName} ({activity.durationSeconds}s)");
+                
                 var request = new SyncActivityRequest
                 {
                     apiKey = _apiKey,
@@ -57,28 +76,33 @@ namespace Allumi.WindowsSensor.Sync
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
                 });
 
+                Log($"[Instant Sync] Request JSON: {json.Substring(0, Math.Min(200, json.Length))}...");
+                Log($"[Instant Sync] Posting to: {_syncUrl}");
+
                 using var content = new StringContent(json, Encoding.UTF8, "application/json");
                 using var res = await _http.PostAsync(_syncUrl, content, ct);
                 
                 if (!res.IsSuccessStatusCode)
                 {
                     var error = await res.Content.ReadAsStringAsync(ct);
-                    Console.WriteLine($"[Instant Sync] Failed: {res.StatusCode} - {error}");
+                    Log($"[Instant Sync] FAILED: {res.StatusCode} - {error}");
                     
                     // Queue for retry if server error
                     if ((int)res.StatusCode >= 500)
                     {
                         QueueActivity(activity);
+                        Log("[Instant Sync] Queued for retry (server error)");
                     }
                     return false;
                 }
 
-                Console.WriteLine($"[Instant Sync] Success: {activity.appName} ({activity.durationSeconds}s)");
+                Log($"[Instant Sync] SUCCESS: {activity.appName} ({activity.durationSeconds}s)");
                 return true;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Instant Sync] Exception: {ex.Message}");
+                Log($"[Instant Sync] EXCEPTION: {ex.GetType().Name} - {ex.Message}");
+                Log($"[Instant Sync] Stack trace: {ex.StackTrace}");
                 // Queue for retry on network errors
                 QueueActivity(activity);
                 return false;

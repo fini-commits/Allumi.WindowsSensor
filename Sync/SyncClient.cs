@@ -59,9 +59,8 @@ namespace Allumi.WindowsSensor.Sync
             {
                 Log($"[Instant Sync] Starting sync for {activity.appName} ({activity.durationSeconds}s)");
                 
-                var request = new SyncActivityRequest
+                var requestBody = new SyncActivityRequest
                 {
-                    apiKey = _apiKey,
                     activities = new List<ActivityEvent> { activity },
                     deviceInfo = new DeviceInfo
                     {
@@ -71,16 +70,21 @@ namespace Allumi.WindowsSensor.Sync
                     }
                 };
 
-                var json = JsonSerializer.Serialize(request, new JsonSerializerOptions 
+                var json = JsonSerializer.Serialize(requestBody, new JsonSerializerOptions 
                 { 
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
                 });
 
                 Log($"[Instant Sync] Request JSON: {json.Substring(0, Math.Min(200, json.Length))}...");
                 Log($"[Instant Sync] Posting to: {_syncUrl}");
+                Log($"[Instant Sync] Authorization: Bearer {_apiKey.Substring(0, 10)}...");
 
                 using var content = new StringContent(json, Encoding.UTF8, "application/json");
-                using var res = await _http.PostAsync(_syncUrl, content, ct);
+                using var request = new HttpRequestMessage(HttpMethod.Post, _syncUrl);
+                request.Content = content;
+                request.Headers.Add("Authorization", $"Bearer {_apiKey}");
+                
+                using var res = await _http.SendAsync(request, ct);
                 
                 if (!res.IsSuccessStatusCode)
                 {
@@ -124,9 +128,8 @@ namespace Allumi.WindowsSensor.Sync
 
             try
             {
-                var request = new SyncActivityRequest
+                var requestBody = new SyncActivityRequest
                 {
-                    apiKey = _apiKey,
                     activities = toSend,
                     deviceInfo = new DeviceInfo
                     {
@@ -136,13 +139,17 @@ namespace Allumi.WindowsSensor.Sync
                     }
                 };
 
-                var json = JsonSerializer.Serialize(request, new JsonSerializerOptions 
+                var json = JsonSerializer.Serialize(requestBody, new JsonSerializerOptions 
                 { 
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
                 });
 
                 using var content = new StringContent(json, Encoding.UTF8, "application/json");
-                using var res = await _http.PostAsync(_syncUrl, content, ct);
+                using var request = new HttpRequestMessage(HttpMethod.Post, _syncUrl);
+                request.Content = content;
+                request.Headers.Add("Authorization", $"Bearer {_apiKey}");
+                
+                using var res = await _http.SendAsync(request, ct);
                 
                 if (!res.IsSuccessStatusCode)
                 {

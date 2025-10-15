@@ -22,7 +22,7 @@ namespace Allumi.WindowsSensor.Models
     // Request wrapper for /sync-device-activity endpoint
     public sealed class SyncActivityRequest
     {
-        public string apiKey { get; set; } = "";
+        // Note: apiKey is sent in Authorization header, not in body
         public List<ActivityEvent> activities { get; set; } = new();
         public DeviceInfo deviceInfo { get; set; } = new();
     }

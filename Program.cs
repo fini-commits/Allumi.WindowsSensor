@@ -10,6 +10,7 @@ using Allumi.WindowsSensor.Models;
 using Allumi.WindowsSensor.Sync;
 using Allumi.WindowsSensor.Update;
 using Allumi.WindowsSensor.Auth;
+using Allumi.WindowsSensor.Categorization;
 
 namespace Allumi.WindowsSensor
 {
@@ -326,12 +327,15 @@ namespace Allumi.WindowsSensor
             // Skip very short sessions (< 1 second)
             if (dur < 1 && !force) return;
 
-            // local debug log
+            // Smart categorization BEFORE sending
+            var categoryResult = ActivityCategorizer.Categorize(_curProc, _curTitle);
+            
+            // local debug log with category
             var status = _isIdle ? "idle" : "active";
-            var line = $"{now:O}\tproc={_curProc}\ttitle={_curTitle}\tstatus={status}\tdur={dur}s";
+            var line = $"{now:O}\tproc={_curProc}\ttitle={_curTitle}\tcategory={categoryResult.Category}\tconfidence={categoryResult.Confidence}%\tstatus={status}\tdur={dur}s";
             try { File.AppendAllText(_logPath, line + Environment.NewLine); } catch { }
 
-            // Create activity event matching device_activities table structure
+            // Create activity event with smart categorization
             var ev = new Models.ActivityEvent
             {
                 appName = _curProc,
@@ -339,15 +343,21 @@ namespace Allumi.WindowsSensor
                 startTime = _curStart.ToUniversalTime().ToString("O"),  // ISO 8601
                 endTime = now.ToUniversalTime().ToString("O"),
                 durationSeconds = dur,
-                category = "other",  // Default category, AI will categorize later
+                category = categoryResult.Category,  // Smart category from our analyzer
                 isIdle = _isIdle
             };
             
-            // Send immediately instead of queuing for batch
+            // Send IMMEDIATELY to database (not queued)
             _ = Task.Run(async () =>
             {
-                _sync.QueueActivity(ev);
-                await _sync.FlushActivitiesAsync();
+                try
+                {
+                    await _sync.SendActivityImmediatelyAsync(ev);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Activity Sync] Error: {ex.Message}");
+                }
             });
         }
 

@@ -35,6 +35,56 @@ namespace Allumi.WindowsSensor.Sync
             }
         }
 
+        // Send a single activity immediately (real-time sync)
+        public async Task<bool> SendActivityImmediatelyAsync(ActivityEvent activity, CancellationToken ct = default)
+        {
+            try
+            {
+                var request = new SyncActivityRequest
+                {
+                    apiKey = _apiKey,
+                    activities = new List<ActivityEvent> { activity },
+                    deviceInfo = new DeviceInfo
+                    {
+                        deviceName = _deviceName,
+                        deviceType = "desktop",
+                        osVersion = GetOSVersion()
+                    }
+                };
+
+                var json = JsonSerializer.Serialize(request, new JsonSerializerOptions 
+                { 
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
+                });
+
+                using var content = new StringContent(json, Encoding.UTF8, "application/json");
+                using var res = await _http.PostAsync(_syncUrl, content, ct);
+                
+                if (!res.IsSuccessStatusCode)
+                {
+                    var error = await res.Content.ReadAsStringAsync(ct);
+                    Console.WriteLine($"[Instant Sync] Failed: {res.StatusCode} - {error}");
+                    
+                    // Queue for retry if server error
+                    if ((int)res.StatusCode >= 500)
+                    {
+                        QueueActivity(activity);
+                    }
+                    return false;
+                }
+
+                Console.WriteLine($"[Instant Sync] Success: {activity.appName} ({activity.durationSeconds}s)");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Instant Sync] Exception: {ex.Message}");
+                // Queue for retry on network errors
+                QueueActivity(activity);
+                return false;
+            }
+        }
+
         // Send batched activities to Vetra
         public async Task<bool> FlushActivitiesAsync(CancellationToken ct = default)
         {

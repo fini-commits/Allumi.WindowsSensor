@@ -71,12 +71,7 @@ jobs:
                          Select-Object -First 1
           
           if ($squirrelExe) {
-            Write-Host "Found Squirrel at: $($squirrelExe.FullName)"
-            try {
-              & $squirrelExe.FullName --version
-            } catch {
-              Write-Host "Could not get version, but exe exists"
-            }
+            Write-Host "✓ Found Squirrel at: $($squirrelExe.FullName)"
           } else {
             Write-Host "`nSquirrel executable not found. Available files:"
             Get-ChildItem squirrel-tools -Recurse | Format-Table Name, DirectoryName
@@ -134,7 +129,6 @@ jobs:
             "--packVersion", "1.0.${{ github.run_number }}",
             "--packAuthors", "Allumi",
             "--packTitle", "Allumi Windows Sensor",
-            "--mainExe", "Allumi.WindowsSensor.exe",
             "--packDir", "publish",
             "--releaseDir", "releases"
           )

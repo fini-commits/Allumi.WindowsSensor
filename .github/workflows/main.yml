@@ -95,4 +95,28 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: base-installer
-          path: dist/AllumiSensorBase.exe
+          path: dist/Setup.exe
+      
+      - name: Create GitHub Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Release v1.0.${{ github.run_number }}
+          body: |
+            Allumi Windows Sensor Release
+            
+            ## Downloads
+            - **Setup.exe** - Base installer for Vetra to customize
+            - **Full package** - Complete Squirrel update package
+            
+            ## Changes
+            - Auto-commit: ${{ github.event.head_commit.message }}
+          files: |
+            dist/Setup.exe
+            dist/RELEASES
+            dist/*.nupkg
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -331,17 +331,15 @@ namespace Allumi.WindowsSensor
             var line = $"{now:O}\tproc={_curProc}\ttitle={_curTitle}\tstatus={status}\tdur={dur}s";
             try { File.AppendAllText(_logPath, line + Environment.NewLine); } catch { }
 
-            // Queue for batch sync (Vetra format)
+            // Create activity event matching device_activities table structure
             var ev = new Models.ActivityEvent
             {
-                deviceId = _deviceId,
-                deviceName = _deviceName,
                 appName = _curProc,
                 windowTitle = _curTitle,
                 startTime = _curStart.ToUniversalTime().ToString("O"),  // ISO 8601
                 endTime = now.ToUniversalTime().ToString("O"),
                 durationSeconds = dur,
-                category = "other",  // AI will categorize
+                category = "other",  // Default category, AI will categorize later
                 isIdle = _isIdle
             };
             

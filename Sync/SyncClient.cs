@@ -56,8 +56,9 @@ namespace Allumi.WindowsSensor.Sync
                     activities = toSend,
                     deviceInfo = new DeviceInfo
                     {
-                        osVersion = GetOSVersion(),
-                        syncFrequency = 60
+                        deviceName = _deviceName,
+                        deviceType = "desktop",
+                        osVersion = GetOSVersion()
                     }
                 };
 

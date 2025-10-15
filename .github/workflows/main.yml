@@ -44,16 +44,13 @@ jobs:
           Write-Host "Publish directory contents:"
           Get-ChildItem -Recurse publish | Format-Table -AutoSize
 
-      - name: Download Squirrel.Windows (legacy CLI for packaging)
+      - name: Install Clowd.Squirrel CLI
         shell: pwsh
         run: |
-          # Use the legacy Squirrel.Windows.CommandLine package which has the CLI tool
-          $version = "2.0.1"
-          $url = "https://www.nuget.org/api/v2/package/squirrel.windows/$version"
-          Invoke-WebRequest -Uri $url -OutFile squirrel.zip
-          Expand-Archive squirrel.zip -DestinationPath squirrel-tools
-          Write-Host "Squirrel tools extracted"
-          Get-ChildItem squirrel-tools -Recurse -Filter *.exe
+          # Install Clowd.Squirrel (modern maintained fork of Squirrel)
+          dotnet tool install -g Clowd.Squirrel
+          Write-Host "Clowd.Squirrel installed"
+          squirrel --version
 
       - name: Find published exe
         id: exe
@@ -73,10 +70,6 @@ jobs:
       - name: Package with Squirrel
         shell: pwsh
         run: |
-          $squirrelExe = Get-ChildItem squirrel-tools -Recurse -Filter Squirrel.exe | Select-Object -First 1
-          if (-not $squirrelExe) { Write-Error "Squirrel.exe not found"; exit 1 }
-          Write-Host "Using Squirrel at: $($squirrelExe.FullName)"
-          
           $exePath = "${{ steps.exe.outputs.path }}"
           Write-Host "Packaging: $exePath"
           
@@ -111,24 +104,24 @@ jobs:
           if (-not $nupkg) { Write-Error "No nupkg created"; exit 1 }
           Write-Host "Created package: $($nupkg.Name)"
           
-          # Now releasify the package
-          Write-Host "Running Squirrel releasify..."
-          & $squirrelExe.FullName --releasify $nupkg.FullName --releaseDir releases --no-msi
+          # Use Clowd.Squirrel to create the release
+          Write-Host "Running Clowd.Squirrel releasify..."
+          squirrel pack --packId AllumiWindowsSensor --packVersion "1.0.${{ github.run_number }}" --packDirectory package/lib/net45 --releaseDir releases
           
           if ($LASTEXITCODE -ne 0) {
-            Write-Error "Squirrel releasify failed with exit code: $LASTEXITCODE"
+            Write-Error "Squirrel pack failed with exit code: $LASTEXITCODE"
             exit 1
           }
           
           Write-Host "`nRelease created in releases folder:"
           Get-ChildItem releases | Format-Table -AutoSize
           
-          $setupExe = Get-ChildItem releases -Filter "Setup.exe" -ErrorAction SilentlyContinue
+          $setupExe = Get-ChildItem releases -Filter "*.exe" -ErrorAction SilentlyContinue
           if ($setupExe) {
-            Write-Host "`nSetup.exe found!"
-            Write-Host "Size: $($setupExe.Length) bytes"
+            Write-Host "`nSetup executable found!"
+            $setupExe | ForEach-Object { Write-Host "  $($_.Name) - Size: $($_.Length) bytes" }
           } else {
-            Write-Error "Setup.exe was not created!"
+            Write-Error "No setup executable was created!"
             exit 1
           }
 
@@ -142,7 +135,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: base-installer
-          path: releases/Setup.exe
+          path: releases/*.exe
       
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main'
@@ -160,7 +153,7 @@ jobs:
             ## Changes
             - Auto-commit: ${{ github.event.head_commit.message }}
           files: |
-            releases/Setup.exe
+            releases/*.exe
             releases/RELEASES
             releases/*.nupkg
           draft: false

@@ -80,9 +80,9 @@ jobs:
           $exePath = "${{ steps.exe.outputs.path }}"
           Write-Host "Packaging: $exePath"
           
-          # Create lib/net45 directory structure for NuGet package
-          New-Item -ItemType Directory -Path "package/lib/net8.0-windows" -Force | Out-Null
-          Copy-Item $exePath -Destination "package/lib/net8.0-windows/"
+          # Create lib/net45 directory structure for NuGet package (Squirrel expects net45)
+          New-Item -ItemType Directory -Path "package/lib/net45" -Force | Out-Null
+          Copy-Item $exePath -Destination "package/lib/net45/"
           
           # Create a NuSpec file
           $nuspec = @"

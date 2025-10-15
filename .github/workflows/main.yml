@@ -132,7 +132,8 @@ jobs:
             "--packDir", "publish",
             "--releaseDir", "releases",
             "--framework", "net8-x64-desktop",
-            "--allowUnaware"
+            "--allowUnaware",
+            "--splashImage", "https://allumi.ai/logo.png"
           )
           
           Write-Host "Command: $($squirrelExe.FullName) $($packArgs -join ' ')"

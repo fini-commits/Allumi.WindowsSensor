@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 using System.Linq;
+using System.Reflection;
 using Allumi.WindowsSensor.Models;
 using Allumi.WindowsSensor.Sync;
 using Allumi.WindowsSensor.Update;
@@ -14,6 +15,8 @@ namespace Allumi.WindowsSensor
 {
     internal static class Program
     {
+        public static string AppVersion => Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.21";
+        
         [STAThread]
         static void Main(string[] args)
         {
@@ -30,8 +33,22 @@ namespace Allumi.WindowsSensor
                 return; // Exit after handling callback
             }
             
-            // Check for updates (placeholder URL - will be updated)
-            _ = UpdateHelper.CheckAndApplyUpdatesAsync("https://your-host/updates");
+            // Check for updates with notification
+            _ = Task.Run(async () =>
+            {
+                await UpdateHelper.CheckAndApplyUpdatesAsync(
+                    "https://your-host/updates",
+                    msg => Debug.WriteLine($"[Update] {msg}"),
+                    onUpdateAvailable: (version) =>
+                    {
+                        var result = MessageBox.Show(
+                            $"A new version {version} is available!\n\nCurrent version: {AppVersion}\n\nWould you like to update now?",
+                            "Update Available - Allumi Sensor",
+                            MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Information);
+                        return result == DialogResult.Yes;
+                    });
+            });
             
             ApplicationConfiguration.Initialize();
             Application.Run(new TrayApp());
@@ -57,7 +74,7 @@ namespace Allumi.WindowsSensor
                 Icon = SystemIcons.Information,
                 Visible = true,
                 ContextMenuStrip = BuildMenu(),
-                Text = "Allumi Sensor • starting…"
+                Text = $"Allumi Sensor v{Program.AppVersion} • starting…"
             };
 
             // Check if configuration is valid
@@ -81,7 +98,7 @@ namespace Allumi.WindowsSensor
 
             // Start tracker
             _tracker = new ActivityTracker(sync, _cfg.deviceId, _cfg.deviceName);
-            _tracker.OnTrayText += t => _tray.Text = $"Allumi Sensor • {t}";
+            _tracker.OnTrayText += t => _tray.Text = $"Allumi Sensor v{Program.AppVersion} • {t}";
             _tracker.Start();
 
             _tray.BalloonTipTitle = "Allumi Sensor";
@@ -159,11 +176,47 @@ namespace Allumi.WindowsSensor
             });
 
             menu.Items.Add(new ToolStripSeparator());
+            
+            // Version info
+            var versionItem = new ToolStripMenuItem($"Version {Program.AppVersion}")
+            {
+                Enabled = false
+            };
+            menu.Items.Add(versionItem);
+            
+            // Check for Updates
+            menu.Items.Add("Check for Updates", null, async (_, __) => await CheckForUpdatesAsync());
+            
+            menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Show config path", null, (_, __) =>
                 MessageBox.Show(_cfgPath, "Allumi Sensor", MessageBoxButtons.OK, MessageBoxIcon.Information));
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Quit", null, (_, __) => ExitThread());
             return menu;
+        }
+
+        private async Task CheckForUpdatesAsync()
+        {
+            _tray.Text = $"Allumi Sensor v{Program.AppVersion} • Checking for updates...";
+            
+            await UpdateHelper.CheckAndApplyUpdatesAsync(
+                "https://your-host/updates",
+                msg => Debug.WriteLine($"[Update] {msg}"),
+                onUpdateAvailable: (version) =>
+                {
+                    var result = MessageBox.Show(
+                        $"A new version {version} is available!\n\nCurrent version: {Program.AppVersion}\n\nWould you like to update now?",
+                        "Update Available - Allumi Sensor",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Information);
+                    return result == DialogResult.Yes;
+                });
+            
+            // Restore tray text
+            if (_tracker != null)
+            {
+                _tray.Text = $"Allumi Sensor v{Program.AppVersion} • Tracking";
+            }
         }
 
         protected override void ExitThreadCore()

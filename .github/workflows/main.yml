@@ -35,7 +35,7 @@ jobs:
           dotnet publish "${{ steps.proj.outputs.path }}"
           -c Release -r win-x64
           -p:PublishSingleFile=true
-          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:SelfContained=false
           -o publish
 
       - name: Show publish output
@@ -131,6 +131,7 @@ jobs:
             "--packTitle", "Allumi Windows Sensor",
             "--packDir", "publish",
             "--releaseDir", "releases",
+            "--framework", "net8-x64-desktop",
             "--allowUnaware"
           )
           

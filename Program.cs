@@ -179,7 +179,7 @@ namespace Allumi.WindowsSensor
     public sealed class ActivityTracker : IDisposable
     {
         private readonly System.Timers.Timer _poll = new(250); // ~4x/sec
-        private readonly System.Timers.Timer _syncTimer = new(5000); // Sync every 5 seconds for real-time tracking
+        // No longer need sync timer - we sync immediately on each activity
         private readonly TimeSpan _idleThreshold = TimeSpan.FromSeconds(60);
         private readonly SyncClient _sync;
         private readonly string _deviceId;
@@ -206,40 +206,26 @@ namespace Allumi.WindowsSensor
             _logPath = Path.Combine(dir, "sensor.log");
 
             _poll.Elapsed += (_, __) => Tick();
-            _syncTimer.Elapsed += async (_, __) => await SyncActivitiesAsync();
+            // No sync timer - we sync immediately on each activity
         }
 
         public void Start()
         {
             _curStart = DateTime.UtcNow;
             _poll.Start();
-            _syncTimer.Start();
+            // No sync timer to start
         }
 
         public void Stop()
         {
             _poll.Stop();
-            _syncTimer.Stop();
+            // No sync timer to stop
             CloseCurrentSession(force: true);
-            // Final sync before exit
-            _ = SyncActivitiesAsync();
+            // Final flush on exit
+            _ = _sync.FlushActivitiesAsync();
         }
 
-        private async Task SyncActivitiesAsync()
-        {
-            try
-            {
-                bool success = await _sync.FlushActivitiesAsync();
-                if (!success)
-                {
-                    Console.WriteLine("Sync failed, will retry later");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Sync error: {ex.Message}");
-            }
-        }
+        // Removed SyncActivitiesAsync - now syncing immediately on each activity
 
         private void Tick()
         {
@@ -306,7 +292,12 @@ namespace Allumi.WindowsSensor
                 isIdle = _isIdle
             };
             
-            _sync.QueueActivity(ev);
+            // Send immediately instead of queuing for batch
+            _ = Task.Run(async () =>
+            {
+                _sync.QueueActivity(ev);
+                await _sync.FlushActivitiesAsync();
+            });
         }
 
         public void Dispose()

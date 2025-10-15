@@ -44,13 +44,26 @@ jobs:
           Write-Host "Publish directory contents:"
           Get-ChildItem -Recurse publish | Format-Table -AutoSize
 
-      - name: Install Clowd.Squirrel CLI
+      - name: Download Clowd.Squirrel
         shell: pwsh
         run: |
-          # Install Clowd.Squirrel (modern maintained fork of Squirrel)
-          dotnet tool install -g Clowd.Squirrel
-          Write-Host "Clowd.Squirrel installed"
-          squirrel --version
+          # Download Clowd.Squirrel standalone release
+          $version = "2.11.1"
+          $url = "https://github.com/clowd/Clowd.Squirrel/releases/download/v$version/Clowd.Squirrel.$version.nupkg"
+          Write-Host "Downloading Clowd.Squirrel v$version..."
+          Invoke-WebRequest -Uri $url -OutFile clowd-squirrel.zip
+          Expand-Archive clowd-squirrel.zip -DestinationPath clowd-tools
+          Write-Host "Clowd.Squirrel extracted"
+          
+          # Find the squirrel.exe
+          $squirrelExe = Get-ChildItem clowd-tools -Recurse -Filter "squirrel.exe" | Select-Object -First 1
+          if ($squirrelExe) {
+            Write-Host "Found Squirrel at: $($squirrelExe.FullName)"
+            & $squirrelExe.FullName --version
+          } else {
+            Write-Host "Available executables:"
+            Get-ChildItem clowd-tools -Recurse -Filter "*.exe" | Format-Table Name, DirectoryName
+          }
 
       - name: Find published exe
         id: exe
@@ -70,43 +83,27 @@ jobs:
       - name: Package with Squirrel
         shell: pwsh
         run: |
+          # Find Clowd.Squirrel executable
+          $squirrelExe = Get-ChildItem clowd-tools -Recurse -Filter "squirrel.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $squirrelExe) {
+            Write-Error "squirrel.exe not found in clowd-tools"
+            exit 1
+          }
+          Write-Host "Using Squirrel at: $($squirrelExe.FullName)"
+          
           $exePath = "${{ steps.exe.outputs.path }}"
           Write-Host "Packaging: $exePath"
           
-          # Create lib/net45 directory structure for NuGet package (Squirrel expects net45)
-          New-Item -ItemType Directory -Path "package/lib/net45" -Force | Out-Null
-          Copy-Item $exePath -Destination "package/lib/net45/"
-          
-          # Create a NuSpec file
-          $nuspec = @"
-          <?xml version="1.0" encoding="utf-8"?>
-          <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
-            <metadata>
-              <id>AllumiWindowsSensor</id>
-              <version>1.0.${{ github.run_number }}</version>
-              <title>Allumi Windows Sensor</title>
-              <authors>Allumi</authors>
-              <description>Windows activity tracking sensor for Allumi dashboard</description>
-              <requireLicenseAcceptance>false</requireLicenseAcceptance>
-            </metadata>
-          </package>
-          "@
-          $nuspec | Out-File -FilePath "package/AllumiWindowsSensor.nuspec" -Encoding UTF8
-          
-          # Download NuGet
-          $nugetUrl = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
-          Invoke-WebRequest -Uri $nugetUrl -OutFile "nuget.exe"
-          
-          # Pack using the package directory structure
-          .\nuget.exe pack package/AllumiWindowsSensor.nuspec -OutputDirectory .
-          
-          $nupkg = Get-ChildItem -Filter "AllumiWindowsSensor.*.nupkg" | Select-Object -First 1
-          if (-not $nupkg) { Write-Error "No nupkg created"; exit 1 }
-          Write-Host "Created package: $($nupkg.Name)"
-          
-          # Use Clowd.Squirrel to create the release
-          Write-Host "Running Clowd.Squirrel releasify..."
-          squirrel pack --packId AllumiWindowsSensor --packVersion "1.0.${{ github.run_number }}" --packDirectory package/lib/net45 --releaseDir releases
+          # Use Clowd.Squirrel pack command
+          Write-Host "Running Clowd.Squirrel pack..."
+          & $squirrelExe.FullName pack `
+            --packId "AllumiWindowsSensor" `
+            --packVersion "1.0.${{ github.run_number }}" `
+            --packAuthors "Allumi" `
+            --packTitle "Allumi Windows Sensor" `
+            --mainExe "Allumi.WindowsSensor.exe" `
+            --packDir "publish" `
+            --releaseDir "releases"
           
           if ($LASTEXITCODE -ne 0) {
             Write-Error "Squirrel pack failed with exit code: $LASTEXITCODE"
@@ -118,10 +115,12 @@ jobs:
           
           $setupExe = Get-ChildItem releases -Filter "*.exe" -ErrorAction SilentlyContinue
           if ($setupExe) {
-            Write-Host "`nSetup executable found!"
+            Write-Host "`nSetup executable(s) found!"
             $setupExe | ForEach-Object { Write-Host "  $($_.Name) - Size: $($_.Length) bytes" }
           } else {
             Write-Error "No setup executable was created!"
+            Write-Host "`nAll files in releases:"
+            Get-ChildItem releases -Recurse
             exit 1
           }
 

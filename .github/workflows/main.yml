@@ -130,7 +130,8 @@ jobs:
             "--packAuthors", "Allumi",
             "--packTitle", "Allumi Windows Sensor",
             "--packDir", "publish",
-            "--releaseDir", "releases"
+            "--releaseDir", "releases",
+            "--allowUnaware"
           )
           
           Write-Host "Command: $($squirrelExe.FullName) $($packArgs -join ' ')"

@@ -6,7 +6,7 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v8.0": {
-      "Allumi.WindowsSensor/1.0.21": {
+      "Allumi.WindowsSensor/1.0.99": {
         "dependencies": {
           "Clowd.Squirrel": "2.11.1"
         },
@@ -25,7 +25,7 @@
     }
   },
   "libraries": {
-    "Allumi.WindowsSensor/1.0.21": {
+    "Allumi.WindowsSensor/1.0.99": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

@@ -30,6 +30,21 @@ jobs:
       - name: Restore
         run: dotnet restore "${{ steps.proj.outputs.path }}"
 
+      - name: Update version in .csproj
+        shell: pwsh
+        run: |
+          $version = "1.0.${{ github.run_number }}"
+          Write-Host "Setting version to: $version"
+          
+          $csprojPath = "${{ steps.proj.outputs.path }}"
+          $content = Get-Content $csprojPath -Raw
+          $content = $content -replace '<Version>[\d\.]+</Version>', "<Version>$version</Version>"
+          $content = $content -replace '<AssemblyVersion>[\d\.]+</AssemblyVersion>', "<AssemblyVersion>$version.0</AssemblyVersion>"
+          $content = $content -replace '<FileVersion>[\d\.]+</FileVersion>', "<FileVersion>$version.0</FileVersion>"
+          Set-Content $csprojPath $content
+          
+          Write-Host "Updated .csproj with version $version"
+
       - name: Publish single-file exe
         run: >
           dotnet publish "${{ steps.proj.outputs.path }}"

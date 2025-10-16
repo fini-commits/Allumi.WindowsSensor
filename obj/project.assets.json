@@ -85,7 +85,7 @@
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
-    "version": "1.0.21",
+    "version": "1.0.99",
     "restore": {
       "projectUniqueName": "C:\\Users\\finim\\Desktop\\allumi.ai\\Allumi.WindowsSensor\\Allumi.WindowsSensor.csproj",
       "projectName": "Allumi.WindowsSensor",

@@ -16,7 +16,7 @@ namespace Allumi.WindowsSensor
 {
     internal static class Program
     {
-        public static string AppVersion => Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.21";
+        public static string AppVersion => Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0";
         
         [STAThread]
         static void Main(string[] args)

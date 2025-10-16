@@ -6,9 +6,10 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>1.0.21</Version>
-    <AssemblyVersion>1.0.21.0</AssemblyVersion>
-    <FileVersion>1.0.21.0</FileVersion>
+    <!-- Version is set by GitHub Actions during build -->
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>

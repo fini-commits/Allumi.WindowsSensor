@@ -24,36 +24,11 @@ namespace Allumi.WindowsSensor
             var dir = Path.Combine(roaming, "Allumi");
             var path = Path.Combine(dir, "config.json");
 
-            // PRIORITY 1: Try to load embedded config (from custom installer)
-            string? embeddedConfig = EmbeddedConfigReader.ExtractEmbeddedConfig();
-            if (embeddedConfig != null)
-            {
-                try
-                {
-                    var cfg = JsonSerializer.Deserialize<AppConfig>(embeddedConfig) ?? new AppConfig();
-                    
-                    // Save embedded config to file system for future use
-                    Directory.CreateDirectory(dir);
-                    File.WriteAllText(path, embeddedConfig);
-                    
-                    // Store API key securely in Windows Credential Manager
-                    if (!string.IsNullOrWhiteSpace(cfg.apiKey))
-                    {
-                        CredentialManager.SaveApiKey(cfg.apiKey);
-                        Console.WriteLine("API key stored securely in Windows Credential Manager");
-                    }
-                    
-                    Console.WriteLine($"Loaded embedded config and saved to: {path}");
-                    return (cfg, "embedded");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Failed to parse embedded config: {ex.Message}");
-                    // Fall through to try file system
-                }
-            }
+            // DISABLED: Embedded config extraction (was overwriting manual config updates)
+            // string? embeddedConfig = EmbeddedConfigReader.ExtractEmbeddedConfig();
+            // if (embeddedConfig != null) { ... }
 
-            // PRIORITY 2: Try to load from file system
+            // PRIORITY 1: Try to load from file system
             if (!File.Exists(path))
             {
                 // Fallback: next to EXE (for dev)
@@ -71,13 +46,9 @@ namespace Allumi.WindowsSensor
                 var json = File.ReadAllText(path);
                 var cfg = JsonSerializer.Deserialize<AppConfig>(json) ?? new AppConfig();
                 
-                // Try to load API key from Credential Manager first
-                var storedApiKey = CredentialManager.GetApiKey();
-                if (!string.IsNullOrWhiteSpace(storedApiKey))
-                {
-                    cfg.apiKey = storedApiKey;
-                    Console.WriteLine("Loaded API key from Windows Credential Manager");
-                }
+                // DISABLED: Credential Manager (was caching old API keys)
+                // var storedApiKey = CredentialManager.GetApiKey();
+                // if (!string.IsNullOrWhiteSpace(storedApiKey)) { cfg.apiKey = storedApiKey; }
                 
                 return (cfg, path);
             }

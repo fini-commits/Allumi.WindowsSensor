@@ -59,14 +59,26 @@ namespace Allumi.WindowsSensor.Sync
             {
                 Log($"[Instant Sync] Starting sync for {activity.appName} ({activity.durationSeconds}s)");
                 
-                var requestBody = new SyncActivityRequest
+                // Match the working app format: apiKey in body + JWT in Authorization header
+                var requestBody = new
                 {
-                    activities = new List<ActivityEvent> { activity },
-                    deviceInfo = new DeviceInfo
+                    apiKey = _apiKey,  // Send API key in body (like working app)
+                    activities = new[] { new
                     {
+                        deviceId = _deviceId,
                         deviceName = _deviceName,
-                        deviceType = "desktop",
-                        osVersion = GetOSVersion()
+                        appName = activity.appName,
+                        windowTitle = activity.windowTitle,
+                        startTime = activity.startTime,
+                        endTime = activity.endTime,
+                        durationSeconds = activity.durationSeconds,
+                        category = activity.category,
+                        isIdle = activity.isIdle
+                    }},
+                    deviceInfo = new
+                    {
+                        osVersion = GetOSVersion(),
+                        syncFrequency = 60
                     }
                 };
 
@@ -77,14 +89,10 @@ namespace Allumi.WindowsSensor.Sync
 
                 Log($"[Instant Sync] Request JSON: {json.Substring(0, Math.Min(200, json.Length))}...");
                 Log($"[Instant Sync] Posting to: {_syncUrl}");
-                Log($"[Instant Sync] Authorization: Bearer {_apiKey.Substring(0, 10)}...");
+                Log($"[Instant Sync] Using apiKey in body: {_apiKey.Substring(0, 10)}...");
 
                 using var content = new StringContent(json, Encoding.UTF8, "application/json");
-                using var request = new HttpRequestMessage(HttpMethod.Post, _syncUrl);
-                request.Content = content;
-                request.Headers.Add("Authorization", $"Bearer {_apiKey}");
-                
-                using var res = await _http.SendAsync(request, ct);
+                using var res = await _http.PostAsync(_syncUrl, content, ct);
                 
                 if (!res.IsSuccessStatusCode)
                 {

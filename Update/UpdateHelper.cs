@@ -57,6 +57,7 @@ namespace Allumi.WindowsSensor.Update
         {
             try
             {
+                // Don't auto-launch on install - let the URL scheme launch with token
                 SquirrelAwareApp.HandleEvents();
             }
             catch (Exception) { }

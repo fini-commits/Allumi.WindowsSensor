@@ -18,27 +18,36 @@ namespace Allumi.WindowsSensor
 
     internal static class Config
     {
+        private static string GetConfigPath()
+        {
+            // PRIORITY 1: Next to EXE (works for both dev and Squirrel installed app)
+            // Squirrel installs to: %LocalAppData%\AllumiWindowsSensor\app-x.x.x\
+            var exeDir = AppContext.BaseDirectory;
+            var path = Path.Combine(exeDir, "config.json");
+            
+            if (File.Exists(path))
+                return path;
+            
+            // PRIORITY 2: Legacy location for existing users (AppData\Roaming\Allumi)
+            var roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var legacyDir = Path.Combine(roaming, "Allumi");
+            var legacyPath = Path.Combine(legacyDir, "config.json");
+            
+            if (File.Exists(legacyPath))
+                return legacyPath;
+            
+            // Default: use EXE directory (for new installs)
+            return path;
+        }
+
         public static (AppConfig cfg, string sourcePath) Load()
         {
-            var roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var dir = Path.Combine(roaming, "Allumi");
-            var path = Path.Combine(dir, "config.json");
-
-            // DISABLED: Embedded config extraction (was overwriting manual config updates)
-            // string? embeddedConfig = EmbeddedConfigReader.ExtractEmbeddedConfig();
-            // if (embeddedConfig != null) { ... }
-
-            // PRIORITY 1: Try to load from file system
-            if (!File.Exists(path))
-            {
-                // Fallback: next to EXE (for dev)
-                path = Path.Combine(AppContext.BaseDirectory, "config.json");
-            }
+            var path = GetConfigPath();
 
             if (!File.Exists(path))
             {
-                Console.WriteLine("No config found. User needs to authenticate.");
-                return (new AppConfig(), path); // empty cfg + the last-checked path
+                Console.WriteLine($"No config found at {path}. User needs to authenticate.");
+                return (new AppConfig(), path);
             }
 
             try
@@ -56,6 +65,34 @@ namespace Allumi.WindowsSensor
             {
                 Console.WriteLine($"Failed to load config from {path}: {ex.Message}");
                 return (new AppConfig(), path);
+            }
+        }
+
+        public static bool Save(string configJson)
+        {
+            try
+            {
+                // Save to EXE directory (works for both dev and Squirrel)
+                var exeDir = AppContext.BaseDirectory;
+                var path = Path.Combine(exeDir, "config.json");
+                
+                // Validate it's valid JSON by trying to parse it
+                var cfg = JsonSerializer.Deserialize<AppConfig>(configJson);
+                if (cfg == null)
+                {
+                    Console.WriteLine("Invalid config JSON received");
+                    return false;
+                }
+                
+                // Save the config
+                File.WriteAllText(path, configJson);
+                Console.WriteLine($"Config saved to {path}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to save config: {ex.Message}");
+                return false;
             }
         }
     }

@@ -27,11 +27,42 @@ namespace Allumi.WindowsSensor
             // Register OAuth protocol handler (allumi://)
             OAuthHandler.RegisterProtocolHandler();
             
+            // Add to Windows startup
+            AddToStartup();
+            
             // Check if launched via allumi:// protocol
             if (args.Length > 0 && args[0].StartsWith("allumi://", StringComparison.OrdinalIgnoreCase))
             {
                 OAuthHandler.HandleProtocolCallback(args[0]);
                 return; // Exit after handling callback
+            }
+        }
+
+        private static void AddToStartup()
+        {
+            try
+            {
+                string appName = "AllumiWindowsSensor";
+                string exePath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                
+                if (string.IsNullOrEmpty(exePath))
+                    return;
+
+                using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true);
+                if (key != null)
+                {
+                    var existingValue = key.GetValue(appName) as string;
+                    // Only add if not already there or path changed
+                    if (existingValue != exePath)
+                    {
+                        key.SetValue(appName, exePath);
+                        Console.WriteLine($"Added to Windows startup: {exePath}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to add to startup: {ex.Message}");
             }
             
             // Check for updates with notification
@@ -120,15 +151,31 @@ namespace Allumi.WindowsSensor
                 
                 if (!string.IsNullOrEmpty(result))
                 {
-                    // Authentication successful - reload config and restart
-                    MessageBox.Show(
-                        "Authentication successful! The app will now restart.",
-                        "Allumi Sensor",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information
-                    );
+                    // Save the config JSON received from OAuth
+                    bool saved = Config.Save(result);
                     
-                    Application.Restart();
+                    if (saved)
+                    {
+                        // Authentication successful - reload config and restart
+                        MessageBox.Show(
+                            "Authentication successful! The app will now restart.",
+                            "Allumi Sensor",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information
+                        );
+                        
+                        Application.Restart();
+                    }
+                    else
+                    {
+                        _tray.Text = "Allumi Sensor • Failed to Save Config";
+                        MessageBox.Show(
+                            "Authentication succeeded but failed to save configuration. Please check permissions.",
+                            "Allumi Sensor",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error
+                        );
+                    }
                 }
                 else
                 {
@@ -159,14 +206,21 @@ namespace Allumi.WindowsSensor
             // Open Log Folder
             menu.Items.Add("Open Log Folder", null, (_, __) =>
             {
-                var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Allumi");
+                var path = Path.Combine(AppContext.BaseDirectory, "logs");
+                Directory.CreateDirectory(path);
                 try { Process.Start("explorer.exe", path); } catch { }
             });
 
             // Live Tail (PowerShell)
             menu.Items.Add("Live Tail (PowerShell)", null, (_, __) =>
             {
-                var log = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Allumi", "sensor.log");
+                var log = Path.Combine(AppContext.BaseDirectory, "logs", "sensor.log");
+                // Create empty log file if it doesn't exist yet
+                Directory.CreateDirectory(Path.GetDirectoryName(log) ?? "");
+                if (!File.Exists(log))
+                {
+                    File.WriteAllText(log, "# Sensor log - waiting for activities...\n");
+                }
                 var psi = new ProcessStartInfo
                 {
                     FileName = "powershell.exe",
@@ -254,10 +308,11 @@ namespace Allumi.WindowsSensor
             _deviceId = deviceId;
             _deviceName = deviceName;
             
-            var roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var dir = Path.Combine(roaming, "Allumi");
-            Directory.CreateDirectory(dir);
-            _logPath = Path.Combine(dir, "sensor.log");
+            // Use EXE directory for logs (works with Squirrel)
+            var exeDir = AppContext.BaseDirectory;
+            var logDir = Path.Combine(exeDir, "logs");
+            Directory.CreateDirectory(logDir);
+            _logPath = Path.Combine(logDir, "sensor.log");
 
             _poll.Elapsed += (_, __) => Tick();
             // No sync timer - we sync immediately on each activity

@@ -24,9 +24,9 @@ namespace Allumi.WindowsSensor.Sync
             _syncUrl = syncUrl;
             _http.Timeout = TimeSpan.FromSeconds(15);
 
-            // Setup logging
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var logDir = Path.Combine(appData, "Allumi");
+            // Setup logging - use EXE directory (works with Squirrel)
+            var exeDir = AppContext.BaseDirectory;
+            var logDir = Path.Combine(exeDir, "logs");
             Directory.CreateDirectory(logDir);
             _logPath = Path.Combine(logDir, "sync.log");
 

@@ -22,6 +22,19 @@ namespace Allumi.WindowsSensor
         [STAThread]
         static void Main(string[] args)
         {
+            // DEBUG: Log all arguments
+            var debugLog = Path.Combine(AppContext.BaseDirectory, "logs", "debug.log");
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(debugLog));
+                File.AppendAllText(debugLog, $"\n[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Main() called with {args.Length} args\n");
+                for (int i = 0; i < args.Length; i++)
+                {
+                    File.AppendAllText(debugLog, $"  args[{i}] = {args[i]}\n");
+                }
+            }
+            catch { }
+
             // Handle Squirrel installation events
             UpdateHelper.HandleSquirrelEvents();
             
@@ -34,18 +47,23 @@ namespace Allumi.WindowsSensor
             // Check if launched via allumi:// protocol
             if (args.Length > 0 && args[0].StartsWith("allumi://", StringComparison.OrdinalIgnoreCase))
             {
+                File.AppendAllText(debugLog, $"  Detected allumi:// URL\n");
+                
                 // Check for setup token (allumi://setup?token=xxx)
                 if (args[0].Contains("/setup?", StringComparison.OrdinalIgnoreCase))
                 {
+                    File.AppendAllText(debugLog, $"  Calling HandleSetupToken()\n");
                     HandleSetupToken(args[0]);
                     return; // Exit after saving token
                 }
                 
+                File.AppendAllText(debugLog, $"  Not a setup URL, calling OAuth handler\n");
                 // OAuth callback (allumi://auth?config=xxx)
                 OAuthHandler.HandleProtocolCallback(args[0]);
                 return; // Exit after handling callback
             }
             
+            File.AppendAllText(debugLog, $"  No URL args, launching app normally\n");
             // Continue to normal app launch
             LaunchApp();
         }

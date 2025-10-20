@@ -6,6 +6,7 @@ using System.Text;
 using System.Windows.Forms;
 using System.Linq;
 using System.Reflection;
+using System.Web;
 using Allumi.WindowsSensor.Models;
 using Allumi.WindowsSensor.Sync;
 using Allumi.WindowsSensor.Update;
@@ -33,9 +34,83 @@ namespace Allumi.WindowsSensor
             // Check if launched via allumi:// protocol
             if (args.Length > 0 && args[0].StartsWith("allumi://", StringComparison.OrdinalIgnoreCase))
             {
+                // Check for setup token (allumi://setup?token=xxx)
+                if (args[0].Contains("/setup?", StringComparison.OrdinalIgnoreCase))
+                {
+                    HandleSetupToken(args[0]);
+                    return; // Exit after saving token
+                }
+                
+                // OAuth callback (allumi://auth?config=xxx)
                 OAuthHandler.HandleProtocolCallback(args[0]);
                 return; // Exit after handling callback
             }
+            
+            // Continue to normal app launch
+            LaunchApp();
+        }
+
+        private static void HandleSetupToken(string setupUrl)
+        {
+            try
+            {
+                // Extract token from URL: allumi://setup?token=tok_xyz123
+                var uri = new Uri(setupUrl);
+                var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
+                var token = queryParams["token"];
+                
+                if (!string.IsNullOrEmpty(token))
+                {
+                    // Save token file for Config.Load() to find
+                    var exeDir = AppContext.BaseDirectory;
+                    var tokenPath = Path.Combine(exeDir, ".exchange-token");
+                    File.WriteAllText(tokenPath, token);
+                    
+                    Console.WriteLine($"Setup token saved to: {tokenPath}");
+                    
+                    // Show success message and launch app
+                    MessageBox.Show(
+                        "Device setup initiated! The app will now start and configure automatically.",
+                        "Allumi Sensor - Setup",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information
+                    );
+                    
+                    // Launch the app normally (will pick up the token)
+                    LaunchApp();
+                }
+                else
+                {
+                    Console.WriteLine("No token found in setup URL");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error handling setup token: {ex.Message}");
+            }
+        }
+
+        private static void LaunchApp()
+        {
+            // Check for updates with notification
+            _ = Task.Run(async () =>
+            {
+                await UpdateHelper.CheckAndApplyUpdatesAsync(
+                    "https://your-host/updates",
+                    msg => Debug.WriteLine($"[Update] {msg}"),
+                    onUpdateAvailable: (version) =>
+                    {
+                        var result = MessageBox.Show(
+                            $"A new version {version} is available!\n\nCurrent version: {AppVersion}\n\nWould you like to update now?",
+                            "Update Available - Allumi Sensor",
+                            MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Information);
+                        return result == DialogResult.Yes;
+                    });
+            });
+            
+            ApplicationConfiguration.Initialize();
+            Application.Run(new TrayApp());
         }
 
         private static void AddToStartup()

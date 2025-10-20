@@ -147,6 +147,9 @@ namespace Allumi.WindowsSensor
                 using var httpClient = new HttpClient();
                 httpClient.Timeout = TimeSpan.FromSeconds(10);
 
+                // Add Supabase anon key header (required for edge functions)
+                httpClient.DefaultRequestHeaders.Add("apikey", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzdGFubnhoZmh1bmFjZ2t2dG1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3MTU5MzYsImV4cCI6MjA2NTI5MTkzNn0.4NFI9C88sQOMzvcvYuTNF8MWSq-1vWESF-HoOUhrVS0");
+
                 var exchangeUrl = "https://lstannxhfhunacgkvtmm.supabase.co/functions/v1/exchange-device-token";
                 
                 var request = new TokenExchangeRequest { token = token };

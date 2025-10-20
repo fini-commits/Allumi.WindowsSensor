@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Windows Sensor app now supports automatic credential provisioning via a secure token exchange system. This eliminates the need to embed credentials in the installer.
+The Windows Sensor app now supports automatic credential provisioning via a secure token exchange system using URL-based token delivery.
 
 ## How It Works
 
@@ -11,75 +11,69 @@ The Windows Sensor app now supports automatic credential provisioning via a secu
 When user clicks "Download Windows" on the dashboard:
 
 ```typescript
-// generate-custom-installer edge function
-1. Create device record in database
-2. Generate API key: alm_<random>
-3. Create exchange token: tok_<random> (expires in 5 minutes)
-4. Store in device_exchange_tokens table:
-   {
-     token: "tok_xyz123",
-     device_id: "windows-xxx",
-     api_key: "alm_p73ba3...",
-     user_id: "user-guid",
-     expires_at: now() + 5 minutes,
-     consumed: false
-   }
-5. Download base installer from GitHub
-6. Create .exchange-token file with token
-7. Package .exchange-token with installer (see below)
-8. Return modified installer to user
+// generate-custom-installer edge function responds with:
+{
+  "installerUrl": "https://github.com/fini-commits/Allumi.WindowsSensor/releases/latest/download/AllumiWindowsSensor-Setup.exe",
+  "exchangeToken": "tok_xyz123",
+  "deviceId": "windows-xxx",
+  "deviceName": "User's Windows PC"
+}
 ```
 
-### 2. Installer Extracts Token (Installer Side)
-
-The installer should extract `.exchange-token` file to:
-```
-%LocalAppData%\AllumiWindowsSensor\app-{version}\.exchange-token
-```
-
-**Methods to achieve this:**
-
-**Option A: Squirrel Package Modification**
-```bash
-# Extract .nupkg from installer
-# Add .exchange-token to package
-# Repackage and sign
+**Database:**
+```sql
+INSERT INTO device_exchange_tokens (
+  token, device_id, api_key, user_id, expires_at
+) VALUES (
+  'tok_xyz123',
+  'windows-xxx',
+  'alm_p73ba3...',
+  'user-guid',
+  NOW() + INTERVAL '5 minutes'
+);
 ```
 
-**Option B: Post-Install Script**
-```bash
-# After Squirrel installs, run script that creates .exchange-token
+### 2. Frontend Downloads Installer and Launches Setup
+
+```javascript
+// Frontend code after user clicks download:
+const { installerUrl, exchangeToken, deviceId } = await response.json();
+
+// Download installer
+const installerBlob = await fetch(installerUrl);
+const url = window.URL.createObjectURL(installerBlob);
+
+// Trigger download
+const a = document.createElement('a');
+a.href = url;
+a.download = 'AllumiWindowsSensor-Setup.exe';
+a.click();
+
+// After user installs (either wait or user confirms)
+setTimeout(() => {
+  // Launch app with token via custom URL scheme
+  window.location.href = `allumi://setup?token=${exchangeToken}`;
+}, 2000); // Or show "Click here after installing"
 ```
 
-**Option C: Environment Variable**
-```bash
-# Set ALLUMI_EXCHANGE_TOKEN environment variable
-# App will read from there if file doesn't exist
-```
-
-### 3. App Exchanges Token on First Launch (Windows App)
+### 3. Windows App Receives Setup Token (Windows App - IMPLEMENTED ✅)
 
 ```csharp
-// Config.cs - Already implemented!
-1. Check if config.json exists
-   - If yes: load and use ✅
-   - If no: continue to step 2
-
-2. Check for exchange token:
-   - Read from: [EXE_DIR]\.exchange-token
-   - OR from environment variable: ALLUMI_EXCHANGE_TOKEN
-   
-3. If token found:
-   - POST to: /functions/v1/exchange-device-token
-   - Body: { "token": "tok_xyz123" }
-   - Receive config JSON
-   - Save to config.json
-   - Delete .exchange-token file (single-use)
-   - Start tracking ✅
-
-4. If no token or exchange fails:
-   - Show OAuth prompt
-   - User authenticates via browser
+// In Program.cs Main():
+if (args.Length > 0 && args[0].StartsWith("allumi://setup?", StringComparison.OrdinalIgnoreCase))
+{
+    // Extract token: allumi://setup?token=tok_xyz123
+    var token = ExtractTokenFromUrl(args[0]);
+    
+    // Save to .exchange-token file
+    File.WriteAllText("[EXE_DIR]/.exchange-token", token);
+    
+    // Show success message
+    MessageBox.Show("Device setup initiated! Configuring...");
+    
+    // Launch app normally
+    LaunchApp();
+}
 ```
 
 ### 4. Token Exchange Endpoint (Lovable Side - TODO)

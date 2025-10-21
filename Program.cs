@@ -56,25 +56,19 @@ namespace Allumi.WindowsSensor
             // Register OAuth protocol handler (allumi://)
             OAuthHandler.RegisterProtocolHandler();
             
-            // On first run after install, automatically trigger OAuth flow
+            // On first run after install, show onboarding window and require privacy agreement
             if (args.Length > 0 && args[0] == "--squirrel-firstrun")
             {
-                try { File.AppendAllText(debugLog, "  First run detected - checking for existing config\n"); } catch { }
-                
-                // Check if already configured
-                var (existingConfig, _) = Config.Load();
-                if (existingConfig == null)
+                try { File.AppendAllText(debugLog, "  First run detected - showing onboarding window\n"); } catch { }
+                var onboarding = new InstallerOnboardingForm();
+                var result = onboarding.ShowDialog();
+                if (result == DialogResult.OK && onboarding.PolicyAgreed)
                 {
-                    try { File.AppendAllText(debugLog, "  No config found - launching OAuth authentication\n"); } catch { }
-                    // Launch app which will trigger authentication
+                    // TODO: Save agreement status to config and send to backend
                     LaunchApp();
-                    return;
                 }
-                else
-                {
-                    try { File.AppendAllText(debugLog, "  Config exists - launching normally\n"); } catch { }
-                    return; // Already configured, just exit
-                }
+                // If not agreed, just exit
+                return;
             }
             
             // Add to Windows startup
@@ -223,9 +217,12 @@ namespace Allumi.WindowsSensor
             _cfg = configResult.cfg;
             _cfgPath = configResult.sourcePath;
 
+            // Enable dark mode rendering for context menus
+            Application.SetHighDpiMode(HighDpiMode.SystemAware);
+
             _tray = new NotifyIcon
             {
-                Icon = SystemIcons.Information,
+                Icon = new Icon(Path.Combine(AppContext.BaseDirectory, "logo.ico")),
                 Visible = true,
                 ContextMenuStrip = BuildMenu(),
                 Text = $"Allumi Sensor v{Program.AppVersion} • starting…"
@@ -318,20 +315,21 @@ namespace Allumi.WindowsSensor
         private ContextMenuStrip BuildMenu()
         {
             var menu = new ContextMenuStrip();
+            
+            // Apply dark mode styling based on system theme
+            menu.Renderer = new ToolStripProfessionalRenderer(new DarkModeColorTable());
 
-            // Open Log Folder
-            menu.Items.Add("Open Log Folder", null, (_, __) =>
+            // Main actions group
+            menu.Items.Add(new ToolStripMenuItem("Open Log Folder", null, (_, __) =>
             {
                 var path = Path.Combine(AppContext.BaseDirectory, "logs");
                 Directory.CreateDirectory(path);
                 try { Process.Start("explorer.exe", path); } catch { }
-            });
+            }));
 
-            // Live Tail (PowerShell)
-            menu.Items.Add("Live Tail (PowerShell)", null, (_, __) =>
+            menu.Items.Add(new ToolStripMenuItem("Live Tail (PowerShell)", null, (_, __) =>
             {
                 var log = Path.Combine(AppContext.BaseDirectory, "logs", "sensor.log");
-                // Create empty log file if it doesn't exist yet
                 Directory.CreateDirectory(Path.GetDirectoryName(log) ?? "");
                 if (!File.Exists(log))
                 {
@@ -344,25 +342,34 @@ namespace Allumi.WindowsSensor
                     UseShellExecute = true
                 };
                 try { Process.Start(psi); } catch { }
-            });
+            }));
 
             menu.Items.Add(new ToolStripSeparator());
-            
-            // Version info
-            var versionItem = new ToolStripMenuItem($"Version {Program.AppVersion}")
-            {
-                Enabled = false
-            };
-            menu.Items.Add(versionItem);
-            
-            // Check for Updates
-            menu.Items.Add("Check for Updates", null, async (_, __) => await CheckForUpdatesAsync());
-            
+
+            // Info group
+            menu.Items.Add(new ToolStripMenuItem($"Version {Program.AppVersion}") { Enabled = false });
+            menu.Items.Add(new ToolStripMenuItem("Show config path", null, (_, __) =>
+                MessageBox.Show(_cfgPath, "Allumi Sensor", MessageBoxButtons.OK, MessageBoxIcon.Information)));
+            menu.Items.Add(new ToolStripMenuItem("Device Info", null, (_, __) =>
+                MessageBox.Show($"Device ID: {_cfg.deviceId}\nDevice Name: {_cfg.deviceName}", "Device Info", MessageBoxButtons.OK, MessageBoxIcon.Information)));
+
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Show config path", null, (_, __) =>
-                MessageBox.Show(_cfgPath, "Allumi Sensor", MessageBoxButtons.OK, MessageBoxIcon.Information));
+
+            // Update group
+            menu.Items.Add(new ToolStripMenuItem("Check for Updates", null, async (_, __) => await CheckForUpdatesAsync()));
+
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Quit", null, (_, __) => ExitThread());
+
+            // About & Support group
+            menu.Items.Add(new ToolStripMenuItem("About", null, (_, __) =>
+                MessageBox.Show($"Allumi Sensor\nVersion: {Program.AppVersion}\n© 2025 Allumi.ai\nPrivacy: https://allumi.ai/privacy-policy", "About Allumi Sensor", MessageBoxButtons.OK, MessageBoxIcon.Information)));
+            menu.Items.Add(new ToolStripMenuItem("Report a Bug / Contact Support", null, (_, __) =>
+                Process.Start(new ProcessStartInfo { FileName = "https://allumi.ai/support", UseShellExecute = true } )));
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // Quit
+            menu.Items.Add(new ToolStripMenuItem("Quit", null, (_, __) => ExitThread()));
             return menu;
         }
 

@@ -12,7 +12,8 @@ namespace Allumi.WindowsSensor
         public string apiKey   { get; set; } = "";  // device-scoped key
         public string syncUrl  { get; set; } = "";
         public string? userId  { get; set; }
-        public int idleThresholdSeconds { get; set; } = 60;
+    public int idleThresholdSeconds { get; set; } = 60;
+    public DateTime? policyAgreedAt { get; set; } // UTC timestamp when user agreed to privacy policy
 
         // optional: if your Edge Function requires the Supabase anon key in Authorization
         public string? supabaseAnonKey { get; set; }

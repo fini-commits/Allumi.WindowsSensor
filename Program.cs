@@ -252,9 +252,34 @@ namespace Allumi.WindowsSensor
             _tracker.OnTrayText += t => _tray.Text = $"Allumi Sensor v{Program.AppVersion} • {t}";
             _tracker.Start();
 
+            // Start diagnostics reporting (every 5 minutes)
+            StartDiagnosticsReporting();
+
             _tray.BalloonTipTitle = "Allumi Sensor";
             _tray.BalloonTipText = "Tracking active window.";
             _tray.ShowBalloonTip(3000);
+        }
+
+        private void StartDiagnosticsReporting()
+        {
+            _ = Task.Run(async () =>
+            {
+                var diagnostics = new Diagnostics.DiagnosticsReporter(_cfg.syncUrl.Replace("/sync-device-activity", ""), _cfg.deviceId, _cfg.apiKey);
+                
+                while (true)
+                {
+                    try
+                    {
+                        await diagnostics.ReportHealthCheckAsync();
+                        await Task.Delay(TimeSpan.FromMinutes(5)); // Report every 5 minutes
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Diagnostics reporting error: {ex.Message}");
+                        await Task.Delay(TimeSpan.FromMinutes(5)); // Retry after 5 minutes
+                    }
+                }
+            });
         }
 
         private async Task AuthenticateAsync()

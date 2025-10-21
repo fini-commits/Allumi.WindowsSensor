@@ -146,6 +146,9 @@ namespace Allumi.WindowsSensor
 
         private static void LaunchApp()
         {
+            // Must set DPI mode BEFORE ApplicationConfiguration.Initialize()
+            Application.SetHighDpiMode(HighDpiMode.SystemAware);
+            
             // Check for updates from GitHub releases (silent auto-update in background)
             _ = Task.Run(async () =>
             {
@@ -245,8 +248,8 @@ namespace Allumi.WindowsSensor
             _cfg = configResult.cfg;
             _cfgPath = configResult.sourcePath;
 
-            // Enable dark mode rendering for context menus
-            Application.SetHighDpiMode(HighDpiMode.SystemAware);
+            // DPI mode is now set in LaunchApp() before ApplicationConfiguration.Initialize()
+            // Don't set it here
 
             // Load icon with fallback to system icon if logo.ico is missing or corrupt
             Icon trayIcon;

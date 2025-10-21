@@ -18,10 +18,27 @@ namespace Allumi.WindowsSensor
     internal static class Program
     {
         public static string AppVersion => Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0";
+        internal static Mutex? _singleInstanceMutex;
         
         [STAThread]
         static void Main(string[] args)
         {
+            // Ensure only one instance runs at a time
+            bool createdNew;
+            _singleInstanceMutex = new Mutex(true, "AllumiWindowsSensor_SingleInstance", out createdNew);
+            
+            if (!createdNew)
+            {
+                // Another instance is already running
+                MessageBox.Show(
+                    "Allumi Sensor is already running. Check your system tray.",
+                    "Already Running",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
+                return;
+            }
+            
             // DEBUG: Log all arguments
             var debugLog = Path.Combine(AppContext.BaseDirectory, "logs", "debug.log");
             try
@@ -272,7 +289,12 @@ namespace Allumi.WindowsSensor
                         MessageBoxIcon.Information
                     );
                     
+                    // Release mutex before restart to allow new instance
+                    Program._singleInstanceMutex?.ReleaseMutex();
+                    Program._singleInstanceMutex?.Dispose();
+                    
                     Application.Restart();
+                    Application.Exit();
                 }
                 else
                 {

@@ -94,15 +94,8 @@ namespace Allumi.WindowsSensor
                     
                     Console.WriteLine($"Setup token saved to: {tokenPath}");
                     
-                    // Show success message and launch app
-                    MessageBox.Show(
-                        "Device setup initiated! The app will now start and configure automatically.",
-                        "Allumi Sensor - Setup",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information
-                    );
-                    
                     // Launch the app normally (will pick up the token)
+                    // NOTE: Don't show MessageBox here - it creates a window before app initialization!
                     LaunchApp();
                 }
                 else

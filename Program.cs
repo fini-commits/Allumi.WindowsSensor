@@ -133,21 +133,36 @@ namespace Allumi.WindowsSensor
 
         private static void LaunchApp()
         {
-            // Check for updates with notification
+            // Check for updates from GitHub releases (silent auto-update in background)
             _ = Task.Run(async () =>
             {
-                await UpdateHelper.CheckAndApplyUpdatesAsync(
-                    "https://your-host/updates",
-                    msg => Debug.WriteLine($"[Update] {msg}"),
-                    onUpdateAvailable: (version) =>
+                try
+                {
+                    var githubSource = new Squirrel.Sources.GithubSource("https://github.com/fini-commits/Allumi.WindowsSensor", null, false);
+                    using var updateManager = new Squirrel.UpdateManager(githubSource);
+                    
+                    var updateInfo = await updateManager.CheckForUpdate();
+                    
+                    if (updateInfo?.ReleasesToApply?.Count > 0)
                     {
-                        var result = MessageBox.Show(
-                            $"A new version {version} is available!\n\nCurrent version: {AppVersion}\n\nWould you like to update now?",
-                            "Update Available - Allumi Sensor",
-                            MessageBoxButtons.YesNo,
-                            MessageBoxIcon.Information);
-                        return result == DialogResult.Yes;
-                    });
+                        var newVersion = updateInfo.FutureReleaseEntry.Version.ToString();
+                        Debug.WriteLine($"Update available: {newVersion}. Downloading...");
+                        
+                        // Download and apply update silently
+                        await updateManager.DownloadReleases(updateInfo.ReleasesToApply);
+                        await updateManager.ApplyReleases(updateInfo);
+                        
+                        Debug.WriteLine($"Update to {newVersion} installed. Will take effect on next app restart.");
+                    }
+                    else
+                    {
+                        Debug.WriteLine("No updates available. Running latest version.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Auto-update check failed: {ex.Message}");
+                }
             });
             
             ApplicationConfiguration.Initialize();

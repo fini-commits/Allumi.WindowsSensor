@@ -105,6 +105,14 @@ namespace Allumi.WindowsSensor
                 {
                     OAuthHandler.HandleProtocolCallback(args[0]);
                     File.AppendAllText(debugLog, $"  OAuth callback handled successfully\n");
+                    
+                    // Show success message and EXIT - user will manually open app to complete setup
+                    MessageBox.Show(
+                        "Authentication successful! Please open the Allumi Sensor from the Start Menu to complete setup.",
+                        "Allumi Sensor",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information
+                    );
                 }
                 catch (Exception ex)
                 {
@@ -112,9 +120,8 @@ namespace Allumi.WindowsSensor
                     Console.WriteLine($"OAuth callback error: {ex.Message}");
                 }
                 
-                // Don't exit - launch app to process the saved token
-                File.AppendAllText(debugLog, $"  Launching app after OAuth callback\n");
-                LaunchApp();
+                // Exit after OAuth - don't auto-launch
+                File.AppendAllText(debugLog, $"  Exiting after OAuth callback\n");
                 return;
             }
             

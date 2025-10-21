@@ -454,7 +454,11 @@ namespace Allumi.WindowsSensor
             menu.Items.Add(about);
             
             var support = new ToolStripMenuItem("Report a Bug / Contact Support", null, (_, __) =>
-                Process.Start(new ProcessStartInfo { FileName = "https://allumi.ai/support", UseShellExecute = true } ));
+            {
+                // Include device ID and user ID in support URL for auto-identification
+                var supportUrl = $"https://allumi.ai/support?deviceId={Uri.EscapeDataString(_cfg.deviceId ?? "")}&userId={Uri.EscapeDataString(_cfg.userId ?? "")}";
+                Process.Start(new ProcessStartInfo { FileName = supportUrl, UseShellExecute = true });
+            });
             support.ForeColor = Color.White;
             menu.Items.Add(support);
 

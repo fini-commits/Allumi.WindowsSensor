@@ -73,7 +73,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path dist -Force | Out-Null
-          & tools\squirrel pack --packId "AllrumiWindowsSensor" --packVersion "1.0.0" --packDir publish --releaseDir dist
+          & tools\squirrel pack --packId "AllrumiWindowsSensor" --packVersion "1.0.50" --packDir publish --releaseDir dist
 
       - name: Upload Squirrel artifacts
         uses: actions/upload-artifact@v4

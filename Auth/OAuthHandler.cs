@@ -114,7 +114,15 @@ namespace Allumi.WindowsSensor.Auth
                 
                 if (!string.IsNullOrEmpty(token))
                 {
-                    Console.WriteLine("Received auth token via protocol callback");
+                    Console.WriteLine($"Received auth token via protocol callback: {token}");
+                    
+                    // Save token to file so Config.Load() can exchange it
+                    var exeDir = AppContext.BaseDirectory;
+                    var tokenPath = Path.Combine(exeDir, ".exchange-token");
+                    File.WriteAllText(tokenPath, token);
+                    Console.WriteLine($"Token saved to: {tokenPath}");
+                    
+                    // Also set the TaskCompletionSource if someone is waiting
                     _authResultTcs?.TrySetResult(token);
                 }
                 else if (!string.IsNullOrEmpty(configJson))

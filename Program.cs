@@ -245,9 +245,30 @@ namespace Allumi.WindowsSensor
             // Enable dark mode rendering for context menus
             Application.SetHighDpiMode(HighDpiMode.SystemAware);
 
+            // Load icon with fallback to system icon if logo.ico is missing or corrupt
+            Icon trayIcon;
+            try
+            {
+                var logoPath = Path.Combine(AppContext.BaseDirectory, "logo.ico");
+                if (File.Exists(logoPath) && new FileInfo(logoPath).Length > 0)
+                {
+                    trayIcon = new Icon(logoPath);
+                }
+                else
+                {
+                    // Fallback to system application icon
+                    trayIcon = SystemIcons.Application;
+                }
+            }
+            catch
+            {
+                // If anything fails, use system icon
+                trayIcon = SystemIcons.Application;
+            }
+
             _tray = new NotifyIcon
             {
-                Icon = new Icon(Path.Combine(AppContext.BaseDirectory, "logo.ico")),
+                Icon = trayIcon,
                 Visible = true,
                 ContextMenuStrip = BuildMenu(),
                 Text = $"Allumi Sensor v{Program.AppVersion} • starting…"

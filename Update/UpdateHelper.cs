@@ -10,7 +10,8 @@ namespace Allumi.WindowsSensor.Update
         public static async Task CheckAndApplyUpdatesAsync(
             string feedUrl, 
             Action<string>? log = null,
-            Func<string, bool>? onUpdateAvailable = null)
+            Func<string, bool>? onUpdateAvailable = null,
+            bool showNoUpdateMessage = false)
         {
             try
             {
@@ -41,15 +42,41 @@ namespace Allumi.WindowsSensor.Update
                             Squirrel.UpdateManager.RestartApp();
                         }
                     }
+                    else
+                    {
+                        log?.Invoke("Update postponed by user.");
+                        System.Windows.Forms.MessageBox.Show(
+                            $"Update to version {newVersion} is available.\n\nIt will be installed on the next app launch.",
+                            "Update Available",
+                            System.Windows.Forms.MessageBoxButtons.OK,
+                            System.Windows.Forms.MessageBoxIcon.Information);
+                    }
                 }
                 else
                 {
                     log?.Invoke("No updates available.");
+                    if (showNoUpdateMessage)
+                    {
+                        var currentVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown";
+                        System.Windows.Forms.MessageBox.Show(
+                            $"You are running the latest version ({currentVersion}).",
+                            "No Updates Available",
+                            System.Windows.Forms.MessageBoxButtons.OK,
+                            System.Windows.Forms.MessageBoxIcon.Information);
+                    }
                 }
             }
             catch (Exception ex)
             {
                 log?.Invoke($"Update check failed: {ex.Message}");
+                if (showNoUpdateMessage)
+                {
+                    System.Windows.Forms.MessageBox.Show(
+                        $"Failed to check for updates:\n\n{ex.Message}",
+                        "Update Check Failed",
+                        System.Windows.Forms.MessageBoxButtons.OK,
+                        System.Windows.Forms.MessageBoxIcon.Warning);
+                }
             }
         }
 

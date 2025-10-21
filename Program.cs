@@ -487,7 +487,8 @@ namespace Allumi.WindowsSensor
                         MessageBoxButtons.YesNo,
                         MessageBoxIcon.Information);
                     return result == DialogResult.Yes;
-                });
+                },
+                showNoUpdateMessage: true);
             
             // Restore tray text
             if (_tracker != null)

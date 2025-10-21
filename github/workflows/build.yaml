@@ -75,6 +75,22 @@ jobs:
           New-Item -ItemType Directory -Path dist -Force | Out-Null
           & tools\squirrel pack --packId "AllrumiWindowsSensor" --packVersion "1.0.53" --packDir publish --releaseDir dist
 
+      - name: Show dist output
+        shell: pwsh
+        run: |
+          Write-Host "Dist directory contents:"
+          Get-ChildItem -Recurse dist | Format-Table -AutoSize
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v1.0.53
+          name: Release v1.0.53
+          draft: false
+          prerelease: false
+          files: |
+            dist/*
+
       - name: Upload Squirrel artifacts
         uses: actions/upload-artifact@v4
         with:

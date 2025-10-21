@@ -106,23 +106,36 @@ namespace Allumi.WindowsSensor
                     OAuthHandler.HandleProtocolCallback(args[0]);
                     File.AppendAllText(debugLog, $"  OAuth callback handled successfully\n");
                     
-                    // Show success message and EXIT - user will manually open app to complete setup
+                    // Show success message and RESTART app to complete setup
                     MessageBox.Show(
-                        "Authentication successful! Please open the Allumi Sensor from the Start Menu to complete setup.",
+                        "Authentication successful! The app will now restart to complete setup.",
                         "Allumi Sensor",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Information
                     );
+                    
+                    // Release mutex before restart to allow new instance
+                    File.AppendAllText(debugLog, $"  Releasing mutex and restarting app...\n");
+                    _singleInstanceMutex?.ReleaseMutex();
+                    _singleInstanceMutex?.Dispose();
+                    
+                    // Restart the app - it will pick up the token and exchange it
+                    Application.Restart();
+                    Application.Exit();
+                    return;
                 }
                 catch (Exception ex)
                 {
                     File.AppendAllText(debugLog, $"  ERROR in OAuth callback: {ex.Message}\n{ex.StackTrace}\n");
                     Console.WriteLine($"OAuth callback error: {ex.Message}");
+                    
+                    // Even on error, try to restart (token might still be saved)
+                    _singleInstanceMutex?.ReleaseMutex();
+                    _singleInstanceMutex?.Dispose();
+                    Application.Restart();
+                    Application.Exit();
+                    return;
                 }
-                
-                // Exit after OAuth - don't auto-launch
-                File.AppendAllText(debugLog, $"  Exiting after OAuth callback\n");
-                return;
             }
             
             File.AppendAllText(debugLog, $"  No URL args, launching app normally\n");
@@ -148,9 +161,19 @@ namespace Allumi.WindowsSensor
                     
                     Console.WriteLine($"Setup token saved to: {tokenPath}");
                     
-                    // Launch the app normally (will pick up the token)
-                    // NOTE: Don't show MessageBox here - it creates a window before app initialization!
-                    LaunchApp();
+                    // Save token and restart to complete setup
+                    MessageBox.Show(
+                        "Setup token received! The app will now restart to complete setup.",
+                        "Allumi Sensor",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information
+                    );
+                    
+                    _singleInstanceMutex?.ReleaseMutex();
+                    _singleInstanceMutex?.Dispose();
+                    Application.Restart();
+                    Application.Exit();
+                    return;
                 }
                 else
                 {

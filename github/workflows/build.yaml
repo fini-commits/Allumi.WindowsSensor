@@ -77,7 +77,7 @@ jobs:
         run: |
           squirrel pack `
             --packId "AllrumiWindowsSensor" `
-            --packVersion "1.0.57" `
+            --packVersion "1.0.59" `
             --packDirectory "publish" `
             --releaseDir "dist"
 

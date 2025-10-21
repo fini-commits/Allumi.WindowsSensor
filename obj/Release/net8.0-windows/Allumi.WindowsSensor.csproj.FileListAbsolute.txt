@@ -16,3 +16,4 @@ C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Release\net8.0-windows
 C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Release\net8.0-windows\Allumi.WindowsSensor.pdb
 C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Release\net8.0-windows\Allumi.WindowsSensor.genruntimeconfig.cache
 C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\obj\Release\net8.0-windows\ref\Allumi.WindowsSensor.dll
+C:\Users\finim\Desktop\allumi.ai\Allumi.WindowsSensor\bin\Release\net8.0-windows\logo.ico

@@ -92,11 +92,16 @@ namespace Allumi.WindowsSensor
                         WriteIndented = true 
                     });
                     Save(configJson);
+                    
+                    // Delete token file ONLY after successful exchange
+                    DeleteExchangeToken();
+                    
                     return (exchangedConfig, path);
                 }
                 else
                 {
-                    Console.WriteLine("Token exchange failed or token expired.");
+                    Console.WriteLine("Token exchange failed or token expired. Token file preserved for retry.");
+                    // DON'T delete token - keep it for next retry
                 }
             }
 
@@ -118,9 +123,7 @@ namespace Allumi.WindowsSensor
                     var token = File.ReadAllText(tokenPath).Trim();
                     Console.WriteLine($"Found exchange token file: {tokenPath}");
                     
-                    // Delete token file after reading (single-use)
-                    try { File.Delete(tokenPath); } catch { }
-                    
+                    // DON'T delete token here - delete only after successful exchange
                     return token;
                 }
 
@@ -141,10 +144,31 @@ namespace Allumi.WindowsSensor
             }
         }
 
+        private static void DeleteExchangeToken()
+        {
+            try
+            {
+                var exeDir = AppContext.BaseDirectory;
+                var tokenPath = Path.Combine(exeDir, ".exchange-token");
+                
+                if (File.Exists(tokenPath))
+                {
+                    File.Delete(tokenPath);
+                    Console.WriteLine("Exchange token file deleted after successful exchange");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error deleting exchange token: {ex.Message}");
+            }
+        }
+
         private static AppConfig? ExchangeTokenForConfig(string token)
         {
             try
             {
+                Console.WriteLine($"[TOKEN EXCHANGE] Starting exchange for token: {token.Substring(0, Math.Min(20, token.Length))}...");
+                
                 using var httpClient = new HttpClient();
                 httpClient.Timeout = TimeSpan.FromSeconds(10);
 
@@ -152,15 +176,22 @@ namespace Allumi.WindowsSensor
                 httpClient.DefaultRequestHeaders.Add("apikey", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzdGFubnhoZmh1bmFjZ2t2dG1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3MTU5MzYsImV4cCI6MjA2NTI5MTkzNn0.4NFI9C88sQOMzvcvYuTNF8MWSq-1vWESF-HoOUhrVS0");
 
                 var exchangeUrl = "https://lstannxhfhunacgkvtmm.supabase.co/functions/v1/exchange-device-token";
+                Console.WriteLine($"[TOKEN EXCHANGE] Calling endpoint: {exchangeUrl}");
                 
                 var request = new TokenExchangeRequest { token = token };
                 var response = httpClient.PostAsJsonAsync(exchangeUrl, request).Result;
 
+                Console.WriteLine($"[TOKEN EXCHANGE] Response status: {response.StatusCode}");
+                
                 if (response.IsSuccessStatusCode)
                 {
-                    var result = response.Content.ReadFromJsonAsync<TokenExchangeResponse>().Result;
+                    var responseBody = response.Content.ReadAsStringAsync().Result;
+                    Console.WriteLine($"[TOKEN EXCHANGE] Success response: {responseBody}");
+                    
+                    var result = JsonSerializer.Deserialize<TokenExchangeResponse>(responseBody);
                     if (result != null)
                     {
+                        Console.WriteLine($"[TOKEN EXCHANGE] Received deviceId: {result.deviceId}, userId: {result.userId}");
                         return new AppConfig
                         {
                             deviceId = result.deviceId,
@@ -171,16 +202,21 @@ namespace Allumi.WindowsSensor
                             idleThresholdSeconds = result.idleThresholdSeconds
                         };
                     }
+                    else
+                    {
+                        Console.WriteLine($"[TOKEN EXCHANGE] ERROR: Failed to deserialize response");
+                    }
                 }
                 else
                 {
                     var error = response.Content.ReadAsStringAsync().Result;
-                    Console.WriteLine($"Token exchange failed: {response.StatusCode} - {error}");
+                    Console.WriteLine($"[TOKEN EXCHANGE] ERROR: {response.StatusCode} - {error}");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Exception during token exchange: {ex.Message}");
+                Console.WriteLine($"[TOKEN EXCHANGE] EXCEPTION: {ex.GetType().Name}: {ex.Message}");
+                Console.WriteLine($"[TOKEN EXCHANGE] Stack trace: {ex.StackTrace}");
             }
 
             return null;

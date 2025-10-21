@@ -245,10 +245,10 @@ namespace Allumi.WindowsSensor
             {
                 // Automatically trigger authentication on first run
                 _tray.Text = "Allumi Sensor • Authenticating...";
-                _ = Task.Run(async () =>
-                {
-                    await AuthenticateAsync();
-                });
+                
+                // Start authentication without blocking (stays on UI thread)
+                _ = AuthenticateAsync();
+                
                 return; // Don't start tracking yet
             }
 

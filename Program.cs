@@ -98,9 +98,12 @@ namespace Allumi.WindowsSensor
                 }
                 
                 File.AppendAllText(debugLog, $"  Not a setup URL, calling OAuth handler\n");
-                // OAuth callback (allumi://auth?config=xxx)
+                // OAuth callback (allumi://auth?token=xxx)
                 OAuthHandler.HandleProtocolCallback(args[0]);
-                return; // Exit after handling callback
+                // Don't exit - launch app to process the saved token
+                File.AppendAllText(debugLog, $"  OAuth callback handled, launching app\n");
+                LaunchApp();
+                return;
             }
             
             File.AppendAllText(debugLog, $"  No URL args, launching app normally\n");

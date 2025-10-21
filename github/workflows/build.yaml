@@ -73,7 +73,13 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path dist -Force | Out-Null
-          & tools\squirrel pack --packId "AllrumiWindowsSensor" --packVersion "1.0.53" --packDir publish --releaseDir dist
+                - name: Pack with Squirrel
+        run: |
+          squirrel pack `
+            --packId "AllrumiWindowsSensor" `
+            --packVersion "1.0.57" `
+            --packDirectory "publish" `
+            --releaseDir "dist"
 
       - name: Show dist output
         shell: pwsh

@@ -62,30 +62,43 @@ namespace Allumi.WindowsSensor
         public static (AppConfig cfg, string sourcePath) Load()
         {
             var path = GetConfigPath();
+            var debugLog = Path.Combine(AppContext.BaseDirectory, "logs", "debug.log");
+            var logDir = Path.GetDirectoryName(debugLog);
+            if (!string.IsNullOrEmpty(logDir))
+                Directory.CreateDirectory(logDir);
+            
+            File.AppendAllText(debugLog, $"\n[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Config.Load() called\n");
+            File.AppendAllText(debugLog, $"  Config path: {path}\n");
 
             // PRIORITY 1: Check if config file exists
             if (File.Exists(path))
             {
                 try
                 {
+                    File.AppendAllText(debugLog, $"  Config file exists, loading...\n");
                     var json = File.ReadAllText(path);
                     var cfg = JsonSerializer.Deserialize<AppConfig>(json) ?? new AppConfig();
+                    File.AppendAllText(debugLog, $"  Config loaded successfully. Has apiKey: {!string.IsNullOrEmpty(cfg.apiKey)}\n");
                     return (cfg, path);
                 }
                 catch (Exception ex)
                 {
+                    File.AppendAllText(debugLog, $"  ERROR loading config: {ex.Message}\n");
                     Console.WriteLine($"Failed to load config from {path}: {ex.Message}");
                 }
             }
 
             // PRIORITY 2: Try token exchange (for first-time install)
+            File.AppendAllText(debugLog, $"  No config file, checking for exchange token...\n");
             var token = GetExchangeToken();
             if (!string.IsNullOrEmpty(token))
             {
+                File.AppendAllText(debugLog, $"  Found exchange token: {token.Substring(0, 20)}...\n");
                 Console.WriteLine($"Found exchange token, attempting to exchange for credentials...");
                 var exchangedConfig = ExchangeTokenForConfig(token);
                 if (exchangedConfig != null)
                 {
+                    File.AppendAllText(debugLog, $"  Token exchange SUCCESS! Saving config...\n");
                     Console.WriteLine("Token exchange successful! Saving config...");
                     var configJson = JsonSerializer.Serialize(exchangedConfig, new JsonSerializerOptions 
                     { 
@@ -100,12 +113,18 @@ namespace Allumi.WindowsSensor
                 }
                 else
                 {
+                    File.AppendAllText(debugLog, $"  Token exchange FAILED. Token preserved for retry.\n");
                     Console.WriteLine("Token exchange failed or token expired. Token file preserved for retry.");
                     // DON'T delete token - keep it for next retry
                 }
             }
+            else
+            {
+                File.AppendAllText(debugLog, $"  No exchange token found.\n");
+            }
 
             // PRIORITY 3: No config and no token - need OAuth
+            File.AppendAllText(debugLog, $"  No config and no token. Need OAuth authentication.\n");
             Console.WriteLine($"No config found at {path}. User needs to authenticate.");
             return (new AppConfig(), path);
         }
@@ -165,9 +184,12 @@ namespace Allumi.WindowsSensor
 
         private static AppConfig? ExchangeTokenForConfig(string token)
         {
+            var debugLog = Path.Combine(AppContext.BaseDirectory, "logs", "debug.log");
             try
             {
-                Console.WriteLine($"[TOKEN EXCHANGE] Starting exchange for token: {token.Substring(0, Math.Min(20, token.Length))}...");
+                var logMsg = $"[TOKEN EXCHANGE] Starting exchange for token: {token.Substring(0, Math.Min(20, token.Length))}...";
+                Console.WriteLine(logMsg);
+                File.AppendAllText(debugLog, $"  {logMsg}\n");
                 
                 using var httpClient = new HttpClient();
                 httpClient.Timeout = TimeSpan.FromSeconds(10);
@@ -176,22 +198,30 @@ namespace Allumi.WindowsSensor
                 httpClient.DefaultRequestHeaders.Add("apikey", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzdGFubnhoZmh1bmFjZ2t2dG1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3MTU5MzYsImV4cCI6MjA2NTI5MTkzNn0.4NFI9C88sQOMzvcvYuTNF8MWSq-1vWESF-HoOUhrVS0");
 
                 var exchangeUrl = "https://lstannxhfhunacgkvtmm.supabase.co/functions/v1/exchange-device-token";
-                Console.WriteLine($"[TOKEN EXCHANGE] Calling endpoint: {exchangeUrl}");
+                logMsg = $"[TOKEN EXCHANGE] Calling endpoint: {exchangeUrl}";
+                Console.WriteLine(logMsg);
+                File.AppendAllText(debugLog, $"  {logMsg}\n");
                 
                 var request = new TokenExchangeRequest { token = token };
                 var response = httpClient.PostAsJsonAsync(exchangeUrl, request).Result;
 
-                Console.WriteLine($"[TOKEN EXCHANGE] Response status: {response.StatusCode}");
+                logMsg = $"[TOKEN EXCHANGE] Response status: {response.StatusCode}";
+                Console.WriteLine(logMsg);
+                File.AppendAllText(debugLog, $"  {logMsg}\n");
                 
                 if (response.IsSuccessStatusCode)
                 {
                     var responseBody = response.Content.ReadAsStringAsync().Result;
-                    Console.WriteLine($"[TOKEN EXCHANGE] Success response: {responseBody}");
+                    logMsg = $"[TOKEN EXCHANGE] Success response: {responseBody}";
+                    Console.WriteLine(logMsg);
+                    File.AppendAllText(debugLog, $"  {logMsg}\n");
                     
                     var result = JsonSerializer.Deserialize<TokenExchangeResponse>(responseBody);
                     if (result != null)
                     {
-                        Console.WriteLine($"[TOKEN EXCHANGE] Received deviceId: {result.deviceId}, userId: {result.userId}");
+                        logMsg = $"[TOKEN EXCHANGE] Received deviceId: {result.deviceId}, userId: {result.userId}";
+                        Console.WriteLine(logMsg);
+                        File.AppendAllText(debugLog, $"  {logMsg}\n");
                         return new AppConfig
                         {
                             deviceId = result.deviceId,
@@ -204,19 +234,24 @@ namespace Allumi.WindowsSensor
                     }
                     else
                     {
-                        Console.WriteLine($"[TOKEN EXCHANGE] ERROR: Failed to deserialize response");
+                        logMsg = $"[TOKEN EXCHANGE] ERROR: Failed to deserialize response";
+                        Console.WriteLine(logMsg);
+                        File.AppendAllText(debugLog, $"  {logMsg}\n");
                     }
                 }
                 else
                 {
                     var error = response.Content.ReadAsStringAsync().Result;
-                    Console.WriteLine($"[TOKEN EXCHANGE] ERROR: {response.StatusCode} - {error}");
+                    logMsg = $"[TOKEN EXCHANGE] ERROR: {response.StatusCode} - {error}";
+                    Console.WriteLine(logMsg);
+                    File.AppendAllText(debugLog, $"  {logMsg}\n");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[TOKEN EXCHANGE] EXCEPTION: {ex.GetType().Name}: {ex.Message}");
-                Console.WriteLine($"[TOKEN EXCHANGE] Stack trace: {ex.StackTrace}");
+                var logMsg = $"[TOKEN EXCHANGE] EXCEPTION: {ex.GetType().Name}: {ex.Message}\n  Stack trace: {ex.StackTrace}";
+                Console.WriteLine(logMsg);
+                File.AppendAllText(debugLog, $"  {logMsg}\n");
             }
 
             return null;

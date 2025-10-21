@@ -31,12 +31,20 @@ namespace Allumi.WindowsSensor
                 for (int i = 0; i < args.Length; i++)
                 {
                     File.AppendAllText(debugLog, $"  args[{i}] = {args[i]}\n");
+                    File.AppendAllText(debugLog, $"  Length: {args[i].Length}, Starts with 'allumi://': {args[i].StartsWith("allumi://", StringComparison.OrdinalIgnoreCase)}\n");
                 }
             }
             catch { }
 
             // Handle Squirrel installation events
             UpdateHelper.HandleSquirrelEvents();
+            
+            // EXIT immediately on first-run so URL scheme can launch with token
+            if (args.Length > 0 && args[0] == "--squirrel-firstrun")
+            {
+                try { File.AppendAllText(debugLog, "  Exiting on --squirrel-firstrun to allow URL scheme launch\n"); } catch { }
+                return;
+            }
             
             // Register OAuth protocol handler (allumi://)
             OAuthHandler.RegisterProtocolHandler();
@@ -49,8 +57,8 @@ namespace Allumi.WindowsSensor
             {
                 File.AppendAllText(debugLog, $"  Detected allumi:// URL\n");
                 
-                // Check for setup token (allumi://setup?token=xxx)
-                if (args[0].Contains("/setup?", StringComparison.OrdinalIgnoreCase))
+                // Check for setup token (allumi://setup?token=xxx or allumi://setup/?token=xxx)
+                if (args[0].Contains("/setup", StringComparison.OrdinalIgnoreCase) && args[0].Contains("token=", StringComparison.OrdinalIgnoreCase))
                 {
                     File.AppendAllText(debugLog, $"  Calling HandleSetupToken()\n");
                     HandleSetupToken(args[0]);

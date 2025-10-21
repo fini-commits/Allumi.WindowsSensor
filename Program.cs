@@ -39,15 +39,29 @@ namespace Allumi.WindowsSensor
             // Handle Squirrel installation events
             UpdateHelper.HandleSquirrelEvents();
             
-            // EXIT immediately on first-run so URL scheme can launch with token
-            if (args.Length > 0 && args[0] == "--squirrel-firstrun")
-            {
-                try { File.AppendAllText(debugLog, "  Exiting on --squirrel-firstrun to allow URL scheme launch\n"); } catch { }
-                return;
-            }
-            
             // Register OAuth protocol handler (allumi://)
             OAuthHandler.RegisterProtocolHandler();
+            
+            // On first run after install, automatically trigger OAuth flow
+            if (args.Length > 0 && args[0] == "--squirrel-firstrun")
+            {
+                try { File.AppendAllText(debugLog, "  First run detected - checking for existing config\n"); } catch { }
+                
+                // Check if already configured
+                var (existingConfig, _) = Config.Load();
+                if (existingConfig == null)
+                {
+                    try { File.AppendAllText(debugLog, "  No config found - launching OAuth authentication\n"); } catch { }
+                    // Launch app which will trigger authentication
+                    LaunchApp();
+                    return;
+                }
+                else
+                {
+                    try { File.AppendAllText(debugLog, "  Config exists - launching normally\n"); } catch { }
+                    return; // Already configured, just exit
+                }
+            }
             
             // Add to Windows startup
             AddToStartup();
@@ -210,12 +224,12 @@ namespace Allumi.WindowsSensor
 
             if (!hasConfig)
             {
-                // Show authentication prompt
-                _tray.BalloonTipTitle = "Allumi Sensor - Setup Required";
-                _tray.BalloonTipText = "Click to authenticate with your Vetra account";
-                _tray.BalloonTipClicked += async (_, __) => await AuthenticateAsync();
-                _tray.ShowBalloonTip(5000);
-                _tray.Text = "Allumi Sensor • Not Authenticated";
+                // Automatically trigger authentication on first run
+                _tray.Text = "Allumi Sensor • Authenticating...";
+                _ = Task.Run(async () =>
+                {
+                    await AuthenticateAsync();
+                });
                 return; // Don't start tracking yet
             }
 
@@ -238,10 +252,10 @@ namespace Allumi.WindowsSensor
             {
                 _tray.Text = "Allumi Sensor • Authenticating...";
                 
-                // Use supabaseUrl from config if available, otherwise use default
-                string vetraBaseUrl = _cfg?.supabaseUrl ?? "https://lstannxhfhunacgkvtmm.supabase.co";
+                // Open browser to Allumi for device authentication
+                string allumiBaseUrl = "https://allumi.ai";
                 
-                var result = await OAuthHandler.AuthenticateAsync(vetraBaseUrl);
+                var result = await OAuthHandler.AuthenticateAsync(allumiBaseUrl);
                 
                 if (!string.IsNullOrEmpty(result))
                 {

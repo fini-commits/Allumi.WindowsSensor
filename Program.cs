@@ -210,7 +210,7 @@ namespace Allumi.WindowsSensor
             _ = Task.Run(async () =>
             {
                 await UpdateHelper.CheckAndApplyUpdatesAsync(
-                    "https://your-host/updates",
+                    "https://github.com/fini-commits/Allumi.WindowsSensor",
                     msg => Debug.WriteLine($"[Update] {msg}"),
                     onUpdateAvailable: (version) =>
                     {
@@ -477,7 +477,7 @@ namespace Allumi.WindowsSensor
             _tray.Text = $"Allumi Sensor v{Program.AppVersion} • Checking for updates...";
             
             await UpdateHelper.CheckAndApplyUpdatesAsync(
-                "https://your-host/updates",
+                "https://github.com/fini-commits/Allumi.WindowsSensor",
                 msg => Debug.WriteLine($"[Update] {msg}"),
                 onUpdateAvailable: (version) =>
                 {

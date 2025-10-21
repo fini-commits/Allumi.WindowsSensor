@@ -43,7 +43,9 @@ namespace Allumi.WindowsSensor
             var debugLog = Path.Combine(AppContext.BaseDirectory, "logs", "debug.log");
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(debugLog));
+                var logDir = Path.GetDirectoryName(debugLog);
+                if (!string.IsNullOrEmpty(logDir))
+                    Directory.CreateDirectory(logDir);
                 File.AppendAllText(debugLog, $"\n[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Main() called with {args.Length} args\n");
                 for (int i = 0; i < args.Length; i++)
                 {
@@ -250,8 +252,8 @@ namespace Allumi.WindowsSensor
                 return; // Don't start tracking yet
             }
 
-            // Build sync client from config
-            var sync = new SyncClient(_cfg.apiKey ?? "", _cfg.deviceId, _cfg.deviceName, _cfg.syncUrl);
+            // Build sync client from config (hasConfig check above ensures _cfg is not null)
+            var sync = new SyncClient(_cfg!.apiKey ?? "", _cfg.deviceId, _cfg.deviceName, _cfg.syncUrl);
 
             // Start tracker
             _tracker = new ActivityTracker(sync, _cfg.deviceId, _cfg.deviceName);

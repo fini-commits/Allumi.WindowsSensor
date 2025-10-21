@@ -389,16 +389,20 @@ namespace Allumi.WindowsSensor
             
             // Apply dark mode styling based on system theme
             menu.Renderer = new ToolStripProfessionalRenderer(new DarkModeColorTable());
+            menu.BackColor = Color.FromArgb(37, 37, 38); // Dark background
+            menu.ForeColor = Color.White; // White text
 
             // Main actions group
-            menu.Items.Add(new ToolStripMenuItem("Open Log Folder", null, (_, __) =>
+            var openLog = new ToolStripMenuItem("Open Log Folder", null, (_, __) =>
             {
                 var path = Path.Combine(AppContext.BaseDirectory, "logs");
                 Directory.CreateDirectory(path);
                 try { Process.Start("explorer.exe", path); } catch { }
-            }));
+            });
+            openLog.ForeColor = Color.White;
+            menu.Items.Add(openLog);
 
-            menu.Items.Add(new ToolStripMenuItem("Live Tail (PowerShell)", null, (_, __) =>
+            var liveTail = new ToolStripMenuItem("Live Tail (PowerShell)", null, (_, __) =>
             {
                 var log = Path.Combine(AppContext.BaseDirectory, "logs", "sensor.log");
                 Directory.CreateDirectory(Path.GetDirectoryName(log) ?? "");
@@ -413,34 +417,54 @@ namespace Allumi.WindowsSensor
                     UseShellExecute = true
                 };
                 try { Process.Start(psi); } catch { }
-            }));
+            });
+            liveTail.ForeColor = Color.White;
+            menu.Items.Add(liveTail);
 
             menu.Items.Add(new ToolStripSeparator());
 
             // Info group
-            menu.Items.Add(new ToolStripMenuItem($"Version {Program.AppVersion}") { Enabled = false });
-            menu.Items.Add(new ToolStripMenuItem("Show config path", null, (_, __) =>
-                MessageBox.Show(_cfgPath, "Allumi Sensor", MessageBoxButtons.OK, MessageBoxIcon.Information)));
-            menu.Items.Add(new ToolStripMenuItem("Device Info", null, (_, __) =>
-                MessageBox.Show($"Device ID: {_cfg.deviceId}\nDevice Name: {_cfg.deviceName}", "Device Info", MessageBoxButtons.OK, MessageBoxIcon.Information)));
+            var version = new ToolStripMenuItem($"Version {Program.AppVersion}") { Enabled = false };
+            version.ForeColor = Color.LightGray; // Slightly dimmed for disabled items
+            menu.Items.Add(version);
+            
+            var showConfig = new ToolStripMenuItem("Show config path", null, (_, __) =>
+                MessageBox.Show(_cfgPath, "Allumi Sensor", MessageBoxButtons.OK, MessageBoxIcon.Information));
+            showConfig.ForeColor = Color.White;
+            menu.Items.Add(showConfig);
+            
+            var deviceInfo = new ToolStripMenuItem("Device Info", null, (_, __) =>
+                MessageBox.Show($"Device ID: {_cfg.deviceId}\nDevice Name: {_cfg.deviceName}", "Device Info", MessageBoxButtons.OK, MessageBoxIcon.Information));
+            deviceInfo.ForeColor = Color.White;
+            menu.Items.Add(deviceInfo);
 
             menu.Items.Add(new ToolStripSeparator());
 
             // Update group
-            menu.Items.Add(new ToolStripMenuItem("Check for Updates", null, async (_, __) => await CheckForUpdatesAsync()));
+            var checkUpdates = new ToolStripMenuItem("Check for Updates", null, async (_, __) => await CheckForUpdatesAsync());
+            checkUpdates.ForeColor = Color.White;
+            menu.Items.Add(checkUpdates);
 
             menu.Items.Add(new ToolStripSeparator());
 
             // About & Support group
-            menu.Items.Add(new ToolStripMenuItem("About", null, (_, __) =>
-                MessageBox.Show($"Allumi Sensor\nVersion: {Program.AppVersion}\n© 2025 Allumi.ai\nPrivacy: https://allumi.ai/privacy-policy", "About Allumi Sensor", MessageBoxButtons.OK, MessageBoxIcon.Information)));
-            menu.Items.Add(new ToolStripMenuItem("Report a Bug / Contact Support", null, (_, __) =>
-                Process.Start(new ProcessStartInfo { FileName = "https://allumi.ai/support", UseShellExecute = true } )));
+            var about = new ToolStripMenuItem("About", null, (_, __) =>
+                MessageBox.Show($"Allumi Sensor\nVersion: {Program.AppVersion}\n© 2025 Allumi.ai\nPrivacy: https://allumi.ai/privacy-policy", "About Allumi Sensor", MessageBoxButtons.OK, MessageBoxIcon.Information));
+            about.ForeColor = Color.White;
+            menu.Items.Add(about);
+            
+            var support = new ToolStripMenuItem("Report a Bug / Contact Support", null, (_, __) =>
+                Process.Start(new ProcessStartInfo { FileName = "https://allumi.ai/support", UseShellExecute = true } ));
+            support.ForeColor = Color.White;
+            menu.Items.Add(support);
 
             menu.Items.Add(new ToolStripSeparator());
 
             // Quit
-            menu.Items.Add(new ToolStripMenuItem("Quit", null, (_, __) => ExitThread()));
+            var quit = new ToolStripMenuItem("Quit", null, (_, __) => ExitThread());
+            quit.ForeColor = Color.White;
+            menu.Items.Add(quit);
+            
             return menu;
         }
 

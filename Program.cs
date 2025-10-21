@@ -255,35 +255,24 @@ namespace Allumi.WindowsSensor
                 // Open browser to Allumi for device authentication
                 string allumiBaseUrl = "https://allumi.ai";
                 
-                var result = await OAuthHandler.AuthenticateAsync(allumiBaseUrl);
+                var token = await OAuthHandler.AuthenticateAsync(allumiBaseUrl);
                 
-                if (!string.IsNullOrEmpty(result))
+                if (!string.IsNullOrEmpty(token))
                 {
-                    // Save the config JSON received from OAuth
-                    bool saved = Config.Save(result);
+                    // Save token to file so Config.Load() can pick it up
+                    var exeDir = AppContext.BaseDirectory;
+                    var tokenPath = Path.Combine(exeDir, ".exchange-token");
+                    File.WriteAllText(tokenPath, token);
                     
-                    if (saved)
-                    {
-                        // Authentication successful - reload config and restart
-                        MessageBox.Show(
-                            "Authentication successful! The app will now restart.",
-                            "Allumi Sensor",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Information
-                        );
-                        
-                        Application.Restart();
-                    }
-                    else
-                    {
-                        _tray.Text = "Allumi Sensor • Failed to Save Config";
-                        MessageBox.Show(
-                            "Authentication succeeded but failed to save configuration. Please check permissions.",
-                            "Allumi Sensor",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Error
-                        );
-                    }
+                    // Restart app - it will pick up the token and exchange it
+                    MessageBox.Show(
+                        "Authentication successful! The app will now restart.",
+                        "Allumi Sensor",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information
+                    );
+                    
+                    Application.Restart();
                 }
                 else
                 {

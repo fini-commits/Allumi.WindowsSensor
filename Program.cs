@@ -663,6 +663,57 @@ namespace Allumi.WindowsSensor
             if (length <= 0) return string.Empty;
             var sb = new StringBuilder(length + 2);
             _ = GetWindowText(hWnd, sb, sb.Capacity);
+            var title = sb.ToString();
+            
+            // Normalize fancy Unicode characters to plain text
+            return NormalizeUnicodeText(title);
+        }
+
+        /// <summary>
+        /// Converts fancy Unicode characters (bold, italic, etc.) to plain ASCII equivalents
+        /// </summary>
+        private static string NormalizeUnicodeText(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            
+            // Use .NET's Unicode normalization to decompose characters
+            var normalized = text.Normalize(System.Text.NormalizationForm.FormKD);
+            
+            var sb = new StringBuilder(normalized.Length);
+            
+            foreach (char c in normalized)
+            {
+                // Skip combining characters and control characters
+                if (char.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark &&
+                    char.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.Control)
+                {
+                    // Only keep ASCII-compatible characters
+                    if (c <= 127)
+                    {
+                        sb.Append(c);
+                    }
+                    else
+                    {
+                        // For characters outside ASCII, try to find ASCII equivalent
+                        // Mathematical Bold/Italic/etc (0x1D400-0x1D7FF range)
+                        if (c >= 0x1D400 && c <= 0x1D7FF)
+                        {
+                            // Map back to normal ASCII
+                            int offset = c - 0x1D400;
+                            int baseOffset = offset % 52; // 26 uppercase + 26 lowercase
+                            if (baseOffset < 26) sb.Append((char)('A' + baseOffset));
+                            else if (baseOffset < 52) sb.Append((char)('a' + (baseOffset - 26)));
+                            else sb.Append(c); // Keep as-is if not a letter
+                        }
+                        // Keep other non-ASCII characters (e.g., proper names)
+                        else
+                        {
+                            sb.Append(c);
+                        }
+                    }
+                }
+            }
+            
             return sb.ToString();
         }
     }

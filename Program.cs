@@ -29,13 +29,8 @@ namespace Allumi.WindowsSensor
             
             if (!createdNew)
             {
-                // Another instance is already running
-                MessageBox.Show(
-                    "Allumi Sensor is already running. Check your system tray.",
-                    "Already Running",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-                );
+                // Another instance is already running - just exit silently
+                // NOTE: Cannot use MessageBox here - would create window before ApplicationConfiguration.Initialize()
                 return;
             }
             

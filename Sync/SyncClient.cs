@@ -99,12 +99,10 @@ namespace Allumi.WindowsSensor.Sync
                     var error = await res.Content.ReadAsStringAsync(ct);
                     Log($"[Instant Sync] FAILED: {res.StatusCode} - {error}");
                     
-                    // Queue for retry if server error
-                    if ((int)res.StatusCode >= 500)
-                    {
-                        QueueActivity(activity);
-                        Log("[Instant Sync] Queued for retry (server error)");
-                    }
+                    // DON'T queue for retry - this can cause duplicates
+                    // Let the activity be lost rather than creating duplicates
+                    // The next activity will be tracked normally
+                    Log("[Instant Sync] Activity dropped (no retry to prevent duplicates)");
                     return false;
                 }
 
@@ -115,8 +113,9 @@ namespace Allumi.WindowsSensor.Sync
             {
                 Log($"[Instant Sync] EXCEPTION: {ex.GetType().Name} - {ex.Message}");
                 Log($"[Instant Sync] Stack trace: {ex.StackTrace}");
-                // Queue for retry on network errors
-                QueueActivity(activity);
+                // DON'T queue for retry - this can cause duplicates
+                // Let the activity be lost rather than creating duplicates
+                Log("[Instant Sync] Activity dropped (no retry to prevent duplicates)");
                 return false;
             }
         }

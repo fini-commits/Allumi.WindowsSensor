@@ -492,6 +492,11 @@ namespace Allumi.WindowsSensor
         private bool _isIdle = false;
         private DateTime _curStart = DateTime.UtcNow;
 
+        // Deduplication tracking
+        private string _lastSentKey = "";
+        private DateTime _lastSentTime = DateTime.MinValue;
+        private readonly TimeSpan _minTimeBetweenDuplicates = TimeSpan.FromSeconds(2);
+
         private readonly string _logPath;
 
         public event Action<string>? OnTrayText;
@@ -579,6 +584,25 @@ namespace Allumi.WindowsSensor
             // Smart categorization BEFORE sending
             var categoryResult = ActivityCategorizer.Categorize(_curProc, _curTitle);
             
+            // DEDUPLICATION: Create unique key for this activity
+            // Round start time to nearest second to catch rapid duplicates
+            var roundedStart = new DateTime(
+                _curStart.Year, _curStart.Month, _curStart.Day,
+                _curStart.Hour, _curStart.Minute, _curStart.Second, DateTimeKind.Utc);
+            var activityKey = $"{_curProc}|{_curTitle}|{roundedStart:O}";
+            
+            // Check if this is a duplicate within the debounce window
+            if (activityKey == _lastSentKey && (now - _lastSentTime) < _minTimeBetweenDuplicates)
+            {
+                // This is a duplicate - skip sending
+                try { File.AppendAllText(_logPath, $"{now:O}\tDUPLICATE SKIPPED: {_curProc} - {_curTitle}{Environment.NewLine}"); } catch { }
+                return;
+            }
+            
+            // Update deduplication tracking
+            _lastSentKey = activityKey;
+            _lastSentTime = now;
+            
             // local debug log with category
             var status = _isIdle ? "idle" : "active";
             var line = $"{now:O}\tproc={_curProc}\ttitle={_curTitle}\tcategory={categoryResult.Category}\tconfidence={categoryResult.Confidence}%\tstatus={status}\tdur={dur}s";
@@ -589,7 +613,7 @@ namespace Allumi.WindowsSensor
             {
                 appName = _curProc,
                 windowTitle = _curTitle,
-                startTime = _curStart.ToUniversalTime().ToString("O"),  // ISO 8601
+                startTime = roundedStart.ToString("O"),  // Use rounded time for consistency
                 endTime = now.ToUniversalTime().ToString("O"),
                 durationSeconds = dur,
                 category = categoryResult.Category,  // Smart category from our analyzer

@@ -23,6 +23,12 @@ namespace Allumi.WindowsSensor
         [STAThread]
         static void Main(string[] args)
         {
+            // CRITICAL: These MUST be the first lines - before anything else!
+            // If any IWin32Window is created before these are called, app will crash
+            Application.SetHighDpiMode(HighDpiMode.SystemAware);
+            Application.SetCompatibleTextRenderingDefault(false);
+            Application.EnableVisualStyles();
+            
             // Ensure only one instance runs at a time
             bool createdNew;
             _singleInstanceMutex = new Mutex(true, "AllumiWindowsSensor_SingleInstance", out createdNew);
@@ -30,7 +36,6 @@ namespace Allumi.WindowsSensor
             if (!createdNew)
             {
                 // Another instance is already running - just exit silently
-                // NOTE: Cannot use MessageBox here - would create window before ApplicationConfiguration.Initialize()
                 return;
             }
             
@@ -61,9 +66,6 @@ namespace Allumi.WindowsSensor
             {
                 try { File.AppendAllText(debugLog, "  First run detected - showing onboarding window\n"); } catch { }
                 
-                // CRITICAL: Must call ApplicationConfiguration.Initialize() BEFORE creating any forms!
-                ApplicationConfiguration.Initialize();
-                
                 var onboarding = new InstallerOnboardingForm();
                 var result = onboarding.ShowDialog();
                 if (result == DialogResult.OK && onboarding.PolicyAgreed)
@@ -74,7 +76,7 @@ namespace Allumi.WindowsSensor
                     var configJson = System.Text.Json.JsonSerializer.Serialize(cfg, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
                     Config.Save(configJson);
                     
-                    // Launch the app (but skip ApplicationConfiguration.Initialize() since we already called it)
+                    // Launch the app
                     Application.Run(new TrayApp());
                 }
                 // If not agreed, just exit
@@ -158,9 +160,6 @@ namespace Allumi.WindowsSensor
         {
             try
             {
-                // Must set DPI mode BEFORE ApplicationConfiguration.Initialize()
-                Application.SetHighDpiMode(HighDpiMode.SystemAware);
-                
                 // Check for updates from GitHub releases (silent auto-update in background)
                 _ = Task.Run(async () =>
                 {
@@ -194,7 +193,7 @@ namespace Allumi.WindowsSensor
                     }
                 });
                 
-                ApplicationConfiguration.Initialize();
+                // Application configuration already initialized at top of Main()
                 Application.Run(new TrayApp());
             }
             catch (Exception ex)

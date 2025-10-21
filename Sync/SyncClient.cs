@@ -13,6 +13,7 @@ namespace Allumi.WindowsSensor.Sync
         private readonly string _deviceName;
         private readonly string _syncUrl;
         private readonly List<ActivityEvent> _pendingActivities = new();
+        private readonly HashSet<string> _sentActivityKeys = new(); // Track sent activities to prevent duplicates
         private readonly object _lock = new();
         private readonly string _logPath;
 
@@ -43,18 +44,85 @@ namespace Allumi.WindowsSensor.Sync
             catch { }
         }
 
-        // Queue activity for batch sending
-        public void QueueActivity(ActivityEvent ev)
+        // Create unique key for activity deduplication
+        private string GetActivityKey(ActivityEvent activity)
+        {
+            // Round start time to nearest second for consistent key generation
+            var startTime = DateTime.Parse(activity.startTime);
+            var roundedStart = new DateTime(
+                startTime.Year, startTime.Month, startTime.Day,
+                startTime.Hour, startTime.Minute, startTime.Second, DateTimeKind.Utc);
+            
+            return $"{activity.appName}|{activity.windowTitle}|{roundedStart:O}";
+        }
+
+        // Check if activity was already sent successfully
+        private bool WasAlreadySent(string activityKey)
         {
             lock (_lock)
             {
+                return _sentActivityKeys.Contains(activityKey);
+            }
+        }
+
+        // Mark activity as successfully sent
+        private void MarkAsSent(string activityKey)
+        {
+            lock (_lock)
+            {
+                _sentActivityKeys.Add(activityKey);
+                
+                // Keep only last 1000 keys to prevent memory bloat
+                if (_sentActivityKeys.Count > 1000)
+                {
+                    var oldest = _sentActivityKeys.Take(500).ToList();
+                    foreach (var key in oldest)
+                    {
+                        _sentActivityKeys.Remove(key);
+                    }
+                }
+            }
+        }
+
+        // Queue activity for batch sending (with deduplication check)
+        public void QueueActivity(ActivityEvent ev)
+        {
+            var key = GetActivityKey(ev);
+            
+            lock (_lock)
+            {
+                // Don't queue if already sent
+                if (_sentActivityKeys.Contains(key))
+                {
+                    Log($"[Queue] Skipping duplicate: {ev.appName} - already sent");
+                    return;
+                }
+                
+                // Don't queue if already in pending list
+                var isDuplicate = _pendingActivities.Any(a => GetActivityKey(a) == key);
+                if (isDuplicate)
+                {
+                    Log($"[Queue] Skipping duplicate: {ev.appName} - already queued");
+                    return;
+                }
+                
                 _pendingActivities.Add(ev);
+                Log($"[Queue] Added: {ev.appName} ({_pendingActivities.Count} pending)");
             }
         }
 
         // Send a single activity immediately (real-time sync)
         public async Task<bool> SendActivityImmediatelyAsync(ActivityEvent activity, CancellationToken ct = default)
         {
+            var activityKey = GetActivityKey(activity);
+            
+            // Check if already sent (deduplication)
+            if (WasAlreadySent(activityKey))
+            {
+                Log($"[Instant Sync] Skipping duplicate: {activity.appName} - already sent successfully");
+                return true; // Return true because it was already sent
+            }
+            
             try
             {
                 Log($"[Instant Sync] Starting sync for {activity.appName} ({activity.durationSeconds}s)");
@@ -99,13 +167,17 @@ namespace Allumi.WindowsSensor.Sync
                     var error = await res.Content.ReadAsStringAsync(ct);
                     Log($"[Instant Sync] FAILED: {res.StatusCode} - {error}");
                     
-                    // DON'T queue for retry - this can cause duplicates
-                    // Let the activity be lost rather than creating duplicates
-                    // The next activity will be tracked normally
-                    Log("[Instant Sync] Activity dropped (no retry to prevent duplicates)");
+                    // Queue for retry if server error (with deduplication protection)
+                    if ((int)res.StatusCode >= 500)
+                    {
+                        QueueActivity(activity); // QueueActivity now has deduplication built-in
+                        Log("[Instant Sync] Queued for retry (server error)");
+                    }
                     return false;
                 }
 
+                // SUCCESS - mark as sent to prevent duplicates
+                MarkAsSent(activityKey);
                 Log($"[Instant Sync] SUCCESS: {activity.appName} ({activity.durationSeconds}s)");
                 return true;
             }
@@ -113,9 +185,10 @@ namespace Allumi.WindowsSensor.Sync
             {
                 Log($"[Instant Sync] EXCEPTION: {ex.GetType().Name} - {ex.Message}");
                 Log($"[Instant Sync] Stack trace: {ex.StackTrace}");
-                // DON'T queue for retry - this can cause duplicates
-                // Let the activity be lost rather than creating duplicates
-                Log("[Instant Sync] Activity dropped (no retry to prevent duplicates)");
+                
+                // Queue for retry on network errors (with deduplication protection)
+                QueueActivity(activity); // QueueActivity now has deduplication built-in
+                Log("[Instant Sync] Queued for retry (network error)");
                 return false;
             }
         }
@@ -161,29 +234,39 @@ namespace Allumi.WindowsSensor.Sync
                 if (!res.IsSuccessStatusCode)
                 {
                     var error = await res.Content.ReadAsStringAsync(ct);
-                    Console.WriteLine($"Sync failed: {res.StatusCode} - {error}");
+                    Log($"[Batch Sync] Failed: {res.StatusCode} - {error}");
                     
                     // Re-queue activities if server error (not auth error)
+                    // QueueActivity has built-in deduplication
                     if ((int)res.StatusCode >= 500)
                     {
-                        lock (_lock)
+                        foreach (var activity in toSend)
                         {
-                            _pendingActivities.InsertRange(0, toSend);
+                            QueueActivity(activity);
                         }
+                        Log($"[Batch Sync] Re-queued {toSend.Count} activities for retry");
                     }
                     return false;
                 }
 
+                // SUCCESS - mark all activities as sent
+                foreach (var activity in toSend)
+                {
+                    var key = GetActivityKey(activity);
+                    MarkAsSent(key);
+                }
+                Log($"[Batch Sync] SUCCESS: Sent {toSend.Count} activities");
                 return true;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Sync exception: {ex.Message}");
-                // Re-queue on network errors
-                lock (_lock)
+                Log($"[Batch Sync] Exception: {ex.Message}");
+                // Re-queue on network errors with deduplication
+                foreach (var activity in toSend)
                 {
-                    _pendingActivities.InsertRange(0, toSend);
+                    QueueActivity(activity);
                 }
+                Log($"[Batch Sync] Re-queued {toSend.Count} activities after exception");
                 return false;
             }
         }

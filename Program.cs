@@ -99,9 +99,19 @@ namespace Allumi.WindowsSensor
                 
                 File.AppendAllText(debugLog, $"  Not a setup URL, calling OAuth handler\n");
                 // OAuth callback (allumi://auth?token=xxx)
-                OAuthHandler.HandleProtocolCallback(args[0]);
+                try
+                {
+                    OAuthHandler.HandleProtocolCallback(args[0]);
+                    File.AppendAllText(debugLog, $"  OAuth callback handled successfully\n");
+                }
+                catch (Exception ex)
+                {
+                    File.AppendAllText(debugLog, $"  ERROR in OAuth callback: {ex.Message}\n{ex.StackTrace}\n");
+                    Console.WriteLine($"OAuth callback error: {ex.Message}");
+                }
+                
                 // Don't exit - launch app to process the saved token
-                File.AppendAllText(debugLog, $"  OAuth callback handled, launching app\n");
+                File.AppendAllText(debugLog, $"  Launching app after OAuth callback\n");
                 LaunchApp();
                 return;
             }
@@ -146,43 +156,57 @@ namespace Allumi.WindowsSensor
 
         private static void LaunchApp()
         {
-            // Must set DPI mode BEFORE ApplicationConfiguration.Initialize()
-            Application.SetHighDpiMode(HighDpiMode.SystemAware);
-            
-            // Check for updates from GitHub releases (silent auto-update in background)
-            _ = Task.Run(async () =>
+            try
             {
-                try
+                // Must set DPI mode BEFORE ApplicationConfiguration.Initialize()
+                Application.SetHighDpiMode(HighDpiMode.SystemAware);
+                
+                // Check for updates from GitHub releases (silent auto-update in background)
+                _ = Task.Run(async () =>
                 {
-                    var githubSource = new Squirrel.Sources.GithubSource("https://github.com/fini-commits/Allumi.WindowsSensor", null, false);
-                    using var updateManager = new Squirrel.UpdateManager(githubSource);
-                    
-                    var updateInfo = await updateManager.CheckForUpdate();
-                    
-                    if (updateInfo?.ReleasesToApply?.Count > 0)
+                    try
                     {
-                        var newVersion = updateInfo.FutureReleaseEntry.Version.ToString();
-                        Debug.WriteLine($"Update available: {newVersion}. Downloading...");
+                        var githubSource = new Squirrel.Sources.GithubSource("https://github.com/fini-commits/Allumi.WindowsSensor", null, false);
+                        using var updateManager = new Squirrel.UpdateManager(githubSource);
                         
-                        // Download and apply update silently
-                        await updateManager.DownloadReleases(updateInfo.ReleasesToApply);
-                        await updateManager.ApplyReleases(updateInfo);
+                        var updateInfo = await updateManager.CheckForUpdate();
                         
-                        Debug.WriteLine($"Update to {newVersion} installed. Will take effect on next app restart.");
+                        if (updateInfo?.ReleasesToApply?.Count > 0)
+                        {
+                            var newVersion = updateInfo.FutureReleaseEntry.Version.ToString();
+                            Debug.WriteLine($"Update available: {newVersion}. Downloading...");
+                            
+                            // Download and apply update silently
+                            await updateManager.DownloadReleases(updateInfo.ReleasesToApply);
+                            await updateManager.ApplyReleases(updateInfo);
+                            
+                            Debug.WriteLine($"Update to {newVersion} installed. Will take effect on next app restart.");
+                        }
+                        else
+                        {
+                            Debug.WriteLine("No updates available. Running latest version.");
+                        }
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        Debug.WriteLine("No updates available. Running latest version.");
+                        Debug.WriteLine($"Auto-update check failed: {ex.Message}");
+                        Console.WriteLine($"[AUTO-UPDATE ERROR] {ex.Message}");
                     }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"Auto-update check failed: {ex.Message}");
-                }
-            });
-            
-            ApplicationConfiguration.Initialize();
-            Application.Run(new TrayApp());
+                });
+                
+                ApplicationConfiguration.Initialize();
+                Application.Run(new TrayApp());
+            }
+            catch (Exception ex)
+            {
+                var errorLog = Path.Combine(AppContext.BaseDirectory, "logs", "crash.log");
+                var logDir = Path.GetDirectoryName(errorLog);
+                if (!string.IsNullOrEmpty(logDir))
+                    Directory.CreateDirectory(logDir);
+                File.AppendAllText(errorLog, $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] CRASH in LaunchApp:\n{ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}\n\n");
+                MessageBox.Show($"Fatal error: {ex.Message}\n\nCheck logs\\crash.log for details.", "Allumi Sensor Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                throw;
+            }
         }
 
         private static void AddToStartup()
@@ -244,33 +268,38 @@ namespace Allumi.WindowsSensor
 
         public TrayApp()
         {
-            var configResult = Config.Load();
-            _cfg = configResult.cfg;
-            _cfgPath = configResult.sourcePath;
-
-            // DPI mode is now set in LaunchApp() before ApplicationConfiguration.Initialize()
-            // Don't set it here
-
-            // Load icon with fallback to system icon if logo.ico is missing or corrupt
-            Icon trayIcon;
             try
             {
-                var logoPath = Path.Combine(AppContext.BaseDirectory, "logo.ico");
-                if (File.Exists(logoPath) && new FileInfo(logoPath).Length > 0)
+                var configResult = Config.Load();
+                _cfg = configResult.cfg;
+                _cfgPath = configResult.sourcePath;
+
+                // DPI mode is now set in LaunchApp() before ApplicationConfiguration.Initialize()
+                // Don't set it here
+
+                // Load icon with fallback to system icon if logo.ico is missing or corrupt
+                Icon trayIcon;
+                try
                 {
-                    trayIcon = new Icon(logoPath);
+                    var logoPath = Path.Combine(AppContext.BaseDirectory, "logo.ico");
+                    if (File.Exists(logoPath) && new FileInfo(logoPath).Length > 0)
+                    {
+                        trayIcon = new Icon(logoPath);
+                        Console.WriteLine($"Loaded logo.ico successfully");
+                    }
+                    else
+                    {
+                        // Fallback to system application icon
+                        trayIcon = SystemIcons.Application;
+                        Console.WriteLine($"Using SystemIcons.Application (logo.ico not found or empty)");
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    // Fallback to system application icon
+                    // If anything fails, use system icon
                     trayIcon = SystemIcons.Application;
+                    Console.WriteLine($"Icon load error: {ex.Message}, using SystemIcons.Application");
                 }
-            }
-            catch
-            {
-                // If anything fails, use system icon
-                trayIcon = SystemIcons.Application;
-            }
 
             _tray = new NotifyIcon
             {
@@ -307,12 +336,21 @@ namespace Allumi.WindowsSensor
             // Start diagnostics reporting (every 5 minutes)
             StartDiagnosticsReporting();
 
-            _tray.BalloonTipTitle = "Allumi Sensor";
-            _tray.BalloonTipText = "Tracking active window.";
-            _tray.ShowBalloonTip(3000);
-        }
-
-        private void StartDiagnosticsReporting()
+                _tray.BalloonTipTitle = "Allumi Sensor";
+                _tray.BalloonTipText = "Tracking active window.";
+                _tray.ShowBalloonTip(3000);
+            }
+            catch (Exception ex)
+            {
+                var errorLog = Path.Combine(AppContext.BaseDirectory, "logs", "crash.log");
+                var logDir = Path.GetDirectoryName(errorLog);
+                if (!string.IsNullOrEmpty(logDir))
+                    Directory.CreateDirectory(logDir);
+                File.AppendAllText(errorLog, $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] CRASH in TrayApp constructor:\n{ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}\n\n");
+                Console.WriteLine($"[TRAYAPP ERROR] {ex.Message}");
+                throw;
+            }
+        }        private void StartDiagnosticsReporting()
         {
             _ = Task.Run(async () =>
             {

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Allumi.WindowsSensor")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c1d568977858859bb7b2c2331ebb650de441b360")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+fb63eece2cf9270ae4331e4acf6f06b077e8218a")]
 [assembly: System.Reflection.AssemblyProductAttribute("Allumi.WindowsSensor")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Allumi.WindowsSensor")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

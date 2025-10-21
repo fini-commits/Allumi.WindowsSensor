@@ -16,4 +16,10 @@
     <PackageReference Include="Clowd.Squirrel" Version="2.11.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="logo.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

@@ -60,12 +60,22 @@ namespace Allumi.WindowsSensor
             if (args.Length > 0 && args[0] == "--squirrel-firstrun")
             {
                 try { File.AppendAllText(debugLog, "  First run detected - showing onboarding window\n"); } catch { }
+                
+                // CRITICAL: Must call ApplicationConfiguration.Initialize() BEFORE creating any forms!
+                ApplicationConfiguration.Initialize();
+                
                 var onboarding = new InstallerOnboardingForm();
                 var result = onboarding.ShowDialog();
                 if (result == DialogResult.OK && onboarding.PolicyAgreed)
                 {
-                    // TODO: Save agreement status to config and send to backend
-                    LaunchApp();
+                    // Save agreement timestamp to config
+                    var (cfg, cfgPath) = Config.Load();
+                    cfg.policyAgreedAt = DateTime.UtcNow;
+                    var configJson = System.Text.Json.JsonSerializer.Serialize(cfg, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                    Config.Save(configJson);
+                    
+                    // Launch the app (but skip ApplicationConfiguration.Initialize() since we already called it)
+                    Application.Run(new TrayApp());
                 }
                 // If not agreed, just exit
                 return;

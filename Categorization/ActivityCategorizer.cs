@@ -196,18 +196,80 @@ namespace Allumi.WindowsSensor.Categorization
                 }
             }
 
-            // Default categorization based on common patterns
-            if (lowerApp.Contains("game") || lowerApp.Contains("play"))
+            // Enhanced default categorization - NEVER return Uncategorized
+            // Use smart pattern matching to categorize everything
+            
+            // Gaming keywords
+            if (ContainsAny(lowerApp, "game", "play", "steam", "epic", "battle", "blizzard", "riot", "xbox", "playstation"))
                 return new CategoryResult("Entertainment", new[] { "gaming" }, 70);
             
-            if (lowerApp.Contains("mail") || lowerApp.Contains("outlook"))
-                return new CategoryResult("Communication", new[] { "email" }, 70);
-            
-            if (lowerApp.Contains("chat") || lowerApp.Contains("messenger"))
+            // Communication keywords
+            if (ContainsAny(lowerApp, "mail", "outlook", "chat", "messenger", "teams", "slack", "zoom", "meet", "discord", "telegram", "whatsapp", "signal"))
                 return new CategoryResult("Communication", new[] { "messaging" }, 70);
-
-            // Unknown app - let AI handle it
-            return new CategoryResult("Uncategorized", new[] { "unknown" }, 50);
+            
+            // Development keywords
+            if (ContainsAny(lowerApp, "code", "studio", "dev", "git", "terminal", "cmd", "shell", "compiler", "debugger", "ide"))
+                return new CategoryResult("Development", new[] { "coding" }, 70);
+            
+            // Productivity keywords
+            if (ContainsAny(lowerApp, "office", "word", "excel", "sheet", "doc", "note", "calendar", "task", "todo", "project"))
+                return new CategoryResult("Productivity", new[] { "office-work" }, 70);
+            
+            // Media & Entertainment
+            if (ContainsAny(lowerApp, "media", "player", "music", "video", "spotify", "netflix", "youtube", "vlc", "movie", "audio"))
+                return new CategoryResult("Entertainment", new[] { "media" }, 70);
+            
+            // Design keywords
+            if (ContainsAny(lowerApp, "design", "photo", "image", "draw", "paint", "adobe", "figma", "sketch", "canva"))
+                return new CategoryResult("Design", new[] { "creative" }, 70);
+            
+            // Browser keywords (if not caught earlier)
+            if (ContainsAny(lowerApp, "browser", "web", "chrome", "firefox", "edge", "safari", "opera"))
+                return new CategoryResult("Research", new[] { "web-browsing" }, 70);
+            
+            // System utilities
+            if (ContainsAny(lowerApp, "explorer", "finder", "manager", "settings", "control", "system", "utility", "tools"))
+                return new CategoryResult("Utilities", new[] { "system" }, 70);
+            
+            // File management
+            if (ContainsAny(lowerApp, "file", "folder", "zip", "archive", "backup", "sync", "drive", "cloud"))
+                return new CategoryResult("Utilities", new[] { "file-management" }, 70);
+            
+            // Security & Privacy
+            if (ContainsAny(lowerApp, "security", "antivirus", "firewall", "vpn", "password", "auth", "secure"))
+                return new CategoryResult("Utilities", new[] { "security" }, 70);
+            
+            // Use window title as additional context for final fallback
+            if (!string.IsNullOrWhiteSpace(lowerTitle))
+            {
+                // Check title for category hints
+                if (ContainsAny(lowerTitle, "meeting", "call", "zoom", "teams", "conference"))
+                    return new CategoryResult("Communication", new[] { "video-call" }, 65);
+                
+                if (ContainsAny(lowerTitle, "document", "edit", "write", "draft"))
+                    return new CategoryResult("Productivity", new[] { "writing" }, 65);
+                
+                if (ContainsAny(lowerTitle, "code", "programming", "development", "github", "gitlab"))
+                    return new CategoryResult("Development", new[] { "coding" }, 65);
+                
+                if (ContainsAny(lowerTitle, "video", "music", "stream", "watch", "listen"))
+                    return new CategoryResult("Entertainment", new[] { "media" }, 65);
+            }
+            
+            // Final fallback: If nothing matches, categorize by execution context
+            // Desktop apps that don't match any pattern are likely utilities or custom business apps
+            if (!string.IsNullOrWhiteSpace(lowerApp))
+            {
+                // If app name is simple/short, likely a utility or built-in app
+                if (lowerApp.Length <= 10)
+                    return new CategoryResult("Utilities", new[] { "system", "uncategorized-app" }, 60);
+                
+                // Longer app names are likely custom business/work apps
+                return new CategoryResult("Productivity", new[] { "business-app", "custom-software" }, 60);
+            }
+            
+            // Absolute last resort (should rarely/never happen)
+            return new CategoryResult("Utilities", new[] { "unknown-app" }, 50);
         }
 
         private static CategoryResult? RefineBrowserCategory(string windowTitle)

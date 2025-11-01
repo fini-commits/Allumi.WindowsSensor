@@ -61,26 +61,25 @@ namespace Allumi.WindowsSensor
             // Register OAuth protocol handler (allumi://)
             OAuthHandler.RegisterProtocolHandler();
             
-            // On first run after install, show onboarding window and require privacy agreement
+            // On first run after install, launch app if not configured (like v1.0.41)
             if (args.Length > 0 && args[0] == "--squirrel-firstrun")
             {
-                try { File.AppendAllText(debugLog, "  First run detected - showing onboarding window\n"); } catch { }
+                try { File.AppendAllText(debugLog, "  First run detected - checking for existing config\n"); } catch { }
                 
-                var onboarding = new InstallerOnboardingForm();
-                var result = onboarding.ShowDialog();
-                if (result == DialogResult.OK && onboarding.PolicyAgreed)
+                // Check if already configured
+                var (existingConfig, _) = Config.Load();
+                if (existingConfig == null || string.IsNullOrEmpty(existingConfig.apiKey))
                 {
-                    // Save agreement timestamp to config
-                    var (cfg, cfgPath) = Config.Load();
-                    cfg.policyAgreedAt = DateTime.UtcNow;
-                    var configJson = System.Text.Json.JsonSerializer.Serialize(cfg, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-                    Config.Save(configJson);
-                    
-                    // Launch the app
-                    Application.Run(new TrayApp());
+                    try { File.AppendAllText(debugLog, "  No config found - launching app\n"); } catch { }
+                    // Launch app which will show tray icon with "Authenticate" option
+                    LaunchApp();
+                    return;
                 }
-                // If not agreed, just exit
-                return;
+                else
+                {
+                    try { File.AppendAllText(debugLog, "  Config exists - just exit\n"); } catch { }
+                    return; // Already configured, just exit silently
+                }
             }
             
             // Add to Windows startup
@@ -131,19 +130,9 @@ namespace Allumi.WindowsSensor
                     
                     Console.WriteLine($"Setup token saved to: {tokenPath}");
                     
-                    // Save token and restart to complete setup
-                    MessageBox.Show(
-                        "Setup token received! The app will now restart to complete setup.",
-                        "Allumi Sensor",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information
-                    );
-                    
-                    _singleInstanceMutex?.ReleaseMutex();
-                    _singleInstanceMutex?.Dispose();
-                    Application.Restart();
-                    Application.Exit();
-                    return;
+                    // Launch the app normally (will pick up the token)
+                    // NOTE: Don't show MessageBox here - it creates a window before app initialization!
+                    LaunchApp();
                 }
                 else
                 {

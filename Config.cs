@@ -182,7 +182,7 @@ namespace Allumi.WindowsSensor
             }
         }
 
-        private static AppConfig? ExchangeTokenForConfig(string token)
+        public static AppConfig? ExchangeTokenForConfig(string token)
         {
             var debugLog = Path.Combine(AppContext.BaseDirectory, "logs", "debug.log");
             try

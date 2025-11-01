@@ -342,8 +342,12 @@ namespace Allumi.WindowsSensor
 
         public TrayApp()
         {
+            var debugLog = Path.Combine(AppContext.BaseDirectory, "logs", "debug.log");
+            
             try
             {
+                File.AppendAllText(debugLog, $"\n[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] TrayApp constructor started\n");
+                
                 var configResult = Config.Load();
                 _cfg = configResult.cfg;
                 _cfgPath = configResult.sourcePath;
@@ -388,16 +392,28 @@ namespace Allumi.WindowsSensor
                           && !string.IsNullOrWhiteSpace(_cfg?.apiKey)
                           && !string.IsNullOrWhiteSpace(_cfg?.syncUrl);
 
+            File.AppendAllText(debugLog, $"  hasConfig check:\n");
+            File.AppendAllText(debugLog, $"    deviceId: {(_cfg?.deviceId ?? "[empty]")}\n");
+            File.AppendAllText(debugLog, $"    apiKey: {(string.IsNullOrEmpty(_cfg?.apiKey) ? "[empty]" : "[exists]")}\n");
+            File.AppendAllText(debugLog, $"    syncUrl: {(_cfg?.syncUrl ?? "[empty]")}\n");
+            File.AppendAllText(debugLog, $"    hasConfig: {hasConfig}\n");
+
             if (!hasConfig)
             {
+                File.AppendAllText(debugLog, "  No valid config detected, triggering authentication...\n");
+                
                 // Automatically trigger authentication on first run
                 _tray.Text = "Allumi Sensor • Authenticating...";
                 
                 // Start authentication without blocking (stays on UI thread)
                 _ = AuthenticateAsync();
                 
+                File.AppendAllText(debugLog, "  AuthenticateAsync() called (fire-and-forget)\n");
+                
                 return; // Don't start tracking yet
             }
+
+            File.AppendAllText(debugLog, "  Valid config found, starting activity tracker...\n");
 
             // Build sync client from config (hasConfig check above ensures _cfg is not null)
             var sync = new SyncClient(_cfg!.apiKey ?? "", _cfg.deviceId, _cfg.deviceName, _cfg.syncUrl);
@@ -448,14 +464,23 @@ namespace Allumi.WindowsSensor
 
         private async Task AuthenticateAsync()
         {
+            var debugLog = Path.Combine(AppContext.BaseDirectory, "logs", "debug.log");
+            
             try
             {
+                File.AppendAllText(debugLog, $"\n[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] AuthenticateAsync() STARTED\n");
+                
                 _tray.Text = "Allumi Sensor • Authenticating...";
                 
                 // Open browser to Allumi for device authentication
                 string allumiBaseUrl = "https://allumi.ai";
                 
+                File.AppendAllText(debugLog, $"  Opening browser to: {allumiBaseUrl}\n");
+                File.AppendAllText(debugLog, $"  Waiting for OAuth callback...\n");
+                
                 var token = await OAuthHandler.AuthenticateAsync(allumiBaseUrl);
+                
+                File.AppendAllText(debugLog, $"  OAuth flow completed. Token received: {(!string.IsNullOrEmpty(token) ? "YES" : "NO")}\n");
                 
                 if (!string.IsNullOrEmpty(token))
                 {
@@ -464,6 +489,10 @@ namespace Allumi.WindowsSensor
                     var tokenPath = Path.Combine(exeDir, ".exchange-token");
                     File.WriteAllText(tokenPath, token);
                     
+                    File.AppendAllText(debugLog, $"  Token saved to: {tokenPath}\n");
+                    File.AppendAllText(debugLog, $"  Token length: {token.Length} characters\n");
+                    File.AppendAllText(debugLog, $"  Token starts with: {token.Substring(0, Math.Min(10, token.Length))}...\n");
+                    
                     // Restart app - it will pick up the token and exchange it
                     MessageBox.Show(
                         "Authentication successful! The app will now restart.",
@@ -471,6 +500,8 @@ namespace Allumi.WindowsSensor
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Information
                     );
+                    
+                    File.AppendAllText(debugLog, $"  Releasing mutex and restarting app...\n");
                     
                     // Release mutex before restart to allow new instance
                     Program._singleInstanceMutex?.ReleaseMutex();
@@ -481,6 +512,8 @@ namespace Allumi.WindowsSensor
                 }
                 else
                 {
+                    File.AppendAllText(debugLog, $"  Authentication FAILED: No token received from OAuth flow\n");
+                    
                     _tray.Text = "Allumi Sensor • Authentication Failed";
                     MessageBox.Show(
                         "Authentication failed or timed out. Please try again.",
@@ -492,6 +525,11 @@ namespace Allumi.WindowsSensor
             }
             catch (Exception ex)
             {
+                File.AppendAllText(debugLog, $"  AuthenticateAsync() EXCEPTION:\n");
+                File.AppendAllText(debugLog, $"    Type: {ex.GetType().Name}\n");
+                File.AppendAllText(debugLog, $"    Message: {ex.Message}\n");
+                File.AppendAllText(debugLog, $"    StackTrace:\n{ex.StackTrace}\n");
+                
                 MessageBox.Show(
                     $"Authentication error: {ex.Message}",
                     "Allumi Sensor",

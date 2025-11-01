@@ -494,7 +494,7 @@ namespace Allumi.WindowsSensor
             menu.Items.Add(new ToolStripSeparator());
 
             // Info group
-            var version = new ToolStripMenuItem($"Version {Program.AppVersion}") { Enabled = false };
+            var version = new ToolStripMenuItem($"✓ Version {Program.AppVersion}") { Enabled = false };
             version.ForeColor = Color.LightGray; // Slightly dimmed for disabled items
             menu.Items.Add(version);
             

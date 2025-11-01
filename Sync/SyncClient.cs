@@ -25,13 +25,14 @@ namespace Allumi.WindowsSensor.Sync
             _syncUrl = syncUrl;
             _http.Timeout = TimeSpan.FromSeconds(15);
 
+            // Add Supabase anon key header (required for Edge Functions)
+            _http.DefaultRequestHeaders.Add("apikey", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzdGFubnhoZmh1bmFjZ2t2dG1tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3MTU5MzYsImV4cCI6MjA2NTI5MTkzNn0.4NFI9C88sQOMzvcvYuTNF8MWSq-1vWESF-HoOUhrVS0");
+
             // Setup logging - use EXE directory (works with Squirrel)
             var exeDir = AppContext.BaseDirectory;
             var logDir = Path.Combine(exeDir, "logs");
             Directory.CreateDirectory(logDir);
             _logPath = Path.Combine(logDir, "sync.log");
-
-            // Note: API key is sent in request body, not as a header
         }
 
         private void Log(string message)

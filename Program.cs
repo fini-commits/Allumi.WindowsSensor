@@ -101,86 +101,11 @@ namespace Allumi.WindowsSensor
                 
                 File.AppendAllText(debugLog, $"  Not a setup URL, calling OAuth handler\n");
                 // OAuth callback (allumi://auth?token=xxx)
-                try
-                {
-                    OAuthHandler.HandleProtocolCallback(args[0]);
-                    File.AppendAllText(debugLog, $"  OAuth callback handled successfully\n");
-                    
-                    // NEW APPROACH: Exchange token IMMEDIATELY instead of restarting
-                    File.AppendAllText(debugLog, $"  Attempting immediate token exchange...\n");
-                    
-                    // Get the token we just saved
-                    var exeDir = AppContext.BaseDirectory;
-                    var tokenPath = Path.Combine(exeDir, ".exchange-token");
-                    
-                    if (File.Exists(tokenPath))
-                    {
-                        var token = File.ReadAllText(tokenPath).Trim();
-                        File.AppendAllText(debugLog, $"  Token loaded: {token.Substring(0, 20)}...\n");
-                        
-                        // Exchange it for config RIGHT NOW
-                        var exchangedConfig = Config.ExchangeTokenForConfig(token);
-                        
-                        if (exchangedConfig != null)
-                        {
-                            File.AppendAllText(debugLog, $"  Token exchange SUCCESS!\n");
-                            
-                            // Save the config
-                            var configJson = System.Text.Json.JsonSerializer.Serialize(exchangedConfig, 
-                                new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-                            Config.Save(configJson);
-                            
-                            // Delete the token file
-                            File.Delete(tokenPath);
-                            File.AppendAllText(debugLog, $"  Config saved, token deleted\n");
-                            
-                            // Show success and launch app directly
-                            MessageBox.Show(
-                                "Authentication successful! Allumi Sensor is now ready.",
-                                "Allumi Sensor",
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Information
-                            );
-                            
-                            File.AppendAllText(debugLog, $"  Launching app with valid config\n");
-                            LaunchApp();
-                            return;
-                        }
-                        else
-                        {
-                            File.AppendAllText(debugLog, $"  Token exchange FAILED\n");
-                            MessageBox.Show(
-                                "Authentication failed. Please try again or contact support.",
-                                "Allumi Sensor",
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Error
-                            );
-                            return;
-                        }
-                    }
-                    else
-                    {
-                        File.AppendAllText(debugLog, $"  ERROR: Token file not found after callback\n");
-                        MessageBox.Show(
-                            "Authentication error. Please try again.",
-                            "Allumi Sensor",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Error
-                        );
-                        return;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    File.AppendAllText(debugLog, $"  ERROR in OAuth callback: {ex.Message}\n{ex.StackTrace}\n");
-                    MessageBox.Show(
-                        $"Authentication error: {ex.Message}",
-                        "Allumi Sensor",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error
-                    );
-                    return;
-                }
+                // SIMPLE APPROACH (like v1.0.41): Just save token and exit
+                // Config.Load() will handle token exchange on next app startup
+                OAuthHandler.HandleProtocolCallback(args[0]);
+                File.AppendAllText(debugLog, $"  OAuth callback handled - token saved. User must restart app.\n");
+                return; // Exit - let user manually restart app
             }
             
             File.AppendAllText(debugLog, $"  No URL args, launching app normally\n");
